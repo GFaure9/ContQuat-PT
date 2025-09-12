@@ -1,24 +1,22 @@
-# coding: utf-8
 """
 Collection of helper functions
 """
+
 import copy
 import glob
+import yaml
 import os
 import os.path
 import errno
 import shutil
 import random
 import logging
+import torch
+import numpy as np
+from torch import nn, Tensor
 from logging import Logger
 from typing import Optional, Tuple, List, Union
 from tqdm import tqdm
-import numpy as np
-
-import torch
-from torch import nn, Tensor
-
-import yaml
 
 from ..losses.dtw import dtw
 
@@ -45,10 +43,9 @@ def make_model_dir(model_dir: str, overwrite=False, model_continue=False) -> str
 
         # If set to not overwrite, this will error
         if not overwrite:
-            raise FileExistsError(
-                "Model directory exists and overwriting is disabled.")
+            raise FileExistsError("Model directory exists and overwriting is disabled.")
 
-        # If overwrite, recursively delete previous directory to start with empty dir again
+        # If over-write, recursively delete previous directory to start with empty dir again
         for file in os.listdir(model_dir):
             file_path = os.path.join(model_dir, file)
             if os.path.isfile(file_path):
@@ -71,8 +68,7 @@ def make_logger(model_dir: str, log_file: str = "train.log") -> Logger:
     """
     logger = logging.getLogger(__name__)
     logger.setLevel(level=logging.DEBUG)
-    fh = logging.FileHandler(
-        "{}/{}".format(model_dir, log_file))
+    fh = logging.FileHandler("{}/{}".format(model_dir, log_file))
     fh.setLevel(level=logging.DEBUG)
     logger.addHandler(fh)
     sh = logging.StreamHandler()
@@ -125,6 +121,7 @@ def subsequent_mask(size: int) -> Tensor:
 
     return torch.from_numpy(mask) == 0 # Turns it into True and False's
 
+
 # Subsequent mask of two sizes
 def uneven_subsequent_mask(x_size: int, y_size: int) -> Tensor:
     """
@@ -136,6 +133,7 @@ def uneven_subsequent_mask(x_size: int, y_size: int) -> Tensor:
     """
     mask = np.triu(np.ones((1, x_size, y_size)), k=1).astype('uint8')
     return torch.from_numpy(mask) == 0  # Turns it into True and False's
+
 
 def set_seed(seed: int) -> None:
     """
@@ -200,6 +198,7 @@ def load_checkpoint(path: str, use_cuda: bool = True) -> dict:
     checkpoint = torch.load(path, map_location='cuda' if use_cuda else 'cpu')
     return checkpoint
 
+
 def freeze_params(module: nn.Module) -> None:
     """
     Freeze the parameters of this module,
@@ -221,8 +220,8 @@ def symlink_update(target, link_name):
         else:
             raise e
 
-# Find the best timing match between a reference and a hypothesis, using DTW
 
+# Find the best timing match between a reference and a hypothesis, using DTW
 def calculate_dtw(
         references,
         hypotheses,

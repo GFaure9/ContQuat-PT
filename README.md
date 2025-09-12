@@ -11,7 +11,7 @@ in a **P**rogressive **T**ransformers-like model for *sign language production*.
 > This repository is incomplete and currently 
 > undergoing cleaning and refactoring.
 > Please do not use it until the final version is released 
-> and clearly indicated
+> and clearly indicated.
 
 ---
 
@@ -46,4 +46,4 @@ TODO
 
 ### Acknowledgments
 
-TODO
+TODO  # cite Saunders et al. PT repo (+ paper)

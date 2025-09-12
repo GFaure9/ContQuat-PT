@@ -1,5 +1,6 @@
+# todo: clean / comment / adapt imports
+
 import numpy as np
-import math
 
 import torch
 from torchtext.data import Dataset
@@ -19,23 +20,22 @@ from utils.skeleletal_structures_helper import generate_t_pose, ORIGINAL_S2SL_SK
 
 
 # Validate epoch given a dataset
-def validate_on_data(model: Model,
-                     data: Dataset,
-                     batch_size: int,
-                     max_output_length: int,
-                     eval_metric: str,
-                     loss_function: torch.nn.Module = None,
-                     batch_type: str = "sentence",
-                     type = "val",
-                     BT_model = None,
-                     bones_lengths: np.ndarray = None,
-                     body_ids: Tuple[int, ...] = None,
-                     left_hand_ids: Tuple[int, ...] = None,
-                     right_hand_ids: Tuple[int, ...] = None,
-                     body_aligned_joint_id: int = 1,
-                     hand_aligned_joint_id: int = 0,
-                     skel_structure: Tuple[Tuple[int, int, int], ...] = None,
-                     only_training_metrics: bool = False):
+def validate_on_data(
+        model: Model,
+        data: Dataset,
+        batch_size: int,
+        max_output_length: int,
+        loss_function: torch.nn.Module = None,
+        batch_type: str = "sentence",
+        bones_lengths: np.ndarray = None,
+        body_ids: Tuple[int, ...] = None,
+        left_hand_ids: Tuple[int, ...] = None,
+        right_hand_ids: Tuple[int, ...] = None,
+        body_aligned_joint_id: int = 1,
+        hand_aligned_joint_id: int = 0,
+        skel_structure: Tuple[Tuple[int, int, int], ...] = None,
+        only_training_metrics: bool = False
+):
 
     valid_iter = make_data_iter(
         dataset=data, batch_size=batch_size, batch_type=batch_type,
@@ -51,12 +51,12 @@ def validate_on_data(model: Model,
         valid_inputs = []
         file_paths = []
         all_dtw_scores = []
-        all_pcks = []  # added by GF based on S2SL
-        all_dtw_mje = []  # added by GF
-        all_dtw_scores_by_part = {"body": [], "left_hand": [], "right_hand": []}  # added by GF
-        all_dtw_mje_by_part = {"body": [], "left_hand": [], "right_hand": []}  # added by GF
-        all_bae_dtw_scores = []  # added by GF
-        all_mbae_scores = []  # added by GF
+        all_pcks = []
+        all_dtw_mje = []
+        all_dtw_scores_by_part = {"body": [], "left_hand": [], "right_hand": []}
+        all_dtw_mje_by_part = {"body": [], "left_hand": [], "right_hand": []}
+        all_bae_dtw_scores = []
+        all_mbae_scores = []
 
         valid_loss = 0
         total_ntokens = 0
@@ -99,8 +99,7 @@ def validate_on_data(model: Model,
             output = output[:, :-1, :]  # cut off the percent_tok (?)
             assert targets.shape == output.shape  # if skels: (N_batch, T, N_pts * 3 + 1[counter])
 
-            # Added by me (GF) --- handle 'skels' case with imposed bones lengths (will convert to Quat)
-            # =============================================================================
+            # handle 'skels' case with imposed bones lengths (will convert to Quat)
             if (bones_lengths is not None) and not model.trg_is_quat:  # if `bones_lengths` is not None and targets are Cartesian coordinates
                 N_batch, T = targets.shape[:2]
                 N_bones = len(ORIGINAL_S2SL_SKEL)
@@ -185,10 +184,8 @@ def validate_on_data(model: Model,
                 output = outputs_quat.clone()
 
                 print("Conversion finished!\nPoses will be recomputed with given `bones_lengths`...")
-            # =============================================================================
 
-            # Added by me (GF) --- handle 'quat' case (OR Cartesian transformed to Quat before)
-            # =============================================================================
+            # handle 'quat' case (OR Cartesian transformed to Quat before)
             # (in this case we transform `targets` and `outputs` into cartesian coordinates)
             if model.trg_is_quat or (bones_lengths is not None):
 
@@ -261,22 +258,23 @@ def validate_on_data(model: Model,
                 # 6/ updating `targets` and `outputs` to be in the skel format
                 targets = targets_skel.clone()  # (N_batch, T, N_pts * 3 + 1)
                 output = outputs_skel.clone()
-            # =============================================================================
 
             # Add references, hypotheses and file paths to list
             valid_references.extend(targets)
             valid_hypotheses.extend(output)
             file_paths.extend(batch.file_paths)
             # Add the source sentences to list, by using the model source vocab and batch indices
-            valid_inputs.extend([[model.src_vocab.itos[batch.src[i][j]] for j in range(len(batch.src[i]))] for i in
-                                 range(len(batch.src))])
+            valid_inputs.extend([
+                [model.src_vocab.itos[batch.src[i][j]] for j in range(len(batch.src[i]))]
+                for i in range(len(batch.src))
+            ])
 
             # Calculate the full Dynamic Time Warping score - for evaluation
             dtw_score = calculate_dtw(targets, output)
             all_dtw_scores.extend(dtw_score)
 
-            # Calculate BAE (Bone Angle Error)-based DTW scores - added by me (GF)
-            # + calculate MBAE (Mean Bone Angle Error) after aligning with BAE-based DTW optimal path - added by me (GF)
+            # Calculate BAE (Bone Angle Error)-based DTW scores
+            # + calculate MBAE (Mean Bone Angle Error) after aligning with BAE-based DTW optimal path
             if not only_training_metrics:
                 print("Computing BAE-based DTW score (and MBAE -mean bones angles error-) for each sequence...")
                 bae_dtw_score, mbae_scores = calculate_dtw(
@@ -290,8 +288,8 @@ def validate_on_data(model: Model,
                 all_mbae_scores.extend(mbae_scores)
                 print("BAE-based DTW score (and MBAE) computation terminated!")
 
-            # Calculate the DTW separately for body, left hand and right hand - without the counter! (added by GF)
-            # + calculate the DTW-MJE for each part (added by GF)
+            # Calculate the DTW separately for body, left hand and right hand - without the counter!
+            # + calculate the DTW-MJE for each part
             if not only_training_metrics:
                 body_ids = body_ids if body_ids is not None else DEFAULT_BODY_IDS
                 left_hand_ids = left_hand_ids if left_hand_ids is not None else DEFAULT_LEFT_HAND_IDS
@@ -326,7 +324,7 @@ def validate_on_data(model: Model,
                         dtw_mje = np.linalg.norm(diff, axis=2).mean()
                         all_dtw_mje_by_part[part].append(float(dtw_mje))
 
-            # Compute DTW-MJE and PCK (added by GF)
+            # Compute DTW-MJE and PCK
             if not only_training_metrics:
                 for b in range(output.shape[0]):
                     hyp, ref, _ = alter_DTW_timing(output[b], targets[b])
@@ -338,7 +336,7 @@ def validate_on_data(model: Model,
                     ).mean()
                     all_dtw_mje.append(float(dtw_mje))
 
-                    # Calculate the PCK for entire vid sequence (added by GF based on S2SL)
+                    # Calculate the PCK for entire vid sequence
                     pck_score = pck(ref[:,:-1].reshape(-1, 50, 3), hyp[:,:-1].reshape(-1, 50, 3))
                     all_pcks.append(pck_score)
 

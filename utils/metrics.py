@@ -1,14 +1,13 @@
+"""
+Functions to compute different metrics for the evaluation of SLP results against ground truth data.
+"""
+
 import numpy as np
 from typing import List, Tuple
 from fastdtw import fastdtw
 from scipy.spatial.distance import euclidean
 from nltk.translate.bleu_score import sentence_bleu
 from rouge_score import rouge_scorer
-
-
-"""
-Functions to compute different metrics for the evaluation of SLP results against ground truth data.
-"""
 
 
 def mpje(seq1: np.ndarray, seq2: np.ndarray) -> float:

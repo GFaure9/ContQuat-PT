@@ -1,10 +1,8 @@
-import math
-import numpy as np
-import cv2
 import torch
+import numpy as np
 
 from ..losses.dtw import dtw
-from ..data.constants import PAD_TOKEN
+
 
 # Apply DTW to the produced sequence, so it can be visually compared to the reference sequence
 def alter_DTW_timing(pred_seq,ref_seq):

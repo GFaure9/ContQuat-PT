@@ -1,14 +1,12 @@
-# coding: utf-8
-
 """
-Implements custom initialization
+Implements custom initialization. Original code from https://github.com/BenSaunders27/ProgressiveTransformersSLP
 """
 
 import math
 
 import torch
-import torch.nn as nn
 from torch import Tensor
+import torch.nn as nn
 from torch.nn.init import _calculate_fan_in_and_fan_out
 
 
@@ -31,9 +29,7 @@ def xavier_uniform_n_(w: Tensor, gain: float = 1., n: int = 4) -> None:
         nn.init.uniform_(w, -a, a)
 
 
-# pylint: disable=too-many-branches
-def initialize_model(model: nn.Module, cfg: dict, src_padding_idx: int,
-                     trg_padding_idx: int) -> None:
+def initialize_model(model: nn.Module, cfg: dict, src_padding_idx: int) -> None:
     """
     This initializes a model based on the provided config.
 
@@ -62,10 +58,8 @@ def initialize_model(model: nn.Module, cfg: dict, src_padding_idx: int,
     :param model: model to initialize
     :param cfg: the model configuration
     :param src_padding_idx: index of source padding token
-    :param trg_padding_idx: index of target padding token
     """
 
-    # defaults: xavier, embeddings: normal 0.01, biases: zeros, no orthogonal
     gain = float(cfg.get("init_gain", 1.0))  # for xavier
     init = cfg.get("initializer", "xavier")
     init_weight = float(cfg.get("init_weight", 0.01))
@@ -77,7 +71,6 @@ def initialize_model(model: nn.Module, cfg: dict, src_padding_idx: int,
     bias_init = cfg.get("bias_initializer", "zeros")
     bias_init_weight = float(cfg.get("bias_init_weight", 0.01))
 
-    # pylint: disable=unnecessary-lambda, no-else-return
     def _parse_init(s, scale, _gain):
         scale = float(scale)
         assert scale > 0., "incorrect init_weight"

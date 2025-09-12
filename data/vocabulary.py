@@ -1,16 +1,13 @@
-# coding: utf-8
+"""
+Vocabulary module. Original code from https://github.com/BenSaunders27/ProgressiveTransformersSLP
+"""
 
-"""
-Vocabulary module
-"""
+import numpy as np
 from collections import defaultdict, Counter
 from typing import List
-import numpy as np
-
 from torchtext.data import Dataset
 
-from .constants import UNK_TOKEN, DEFAULT_UNK_ID, \
-    EOS_TOKEN, BOS_TOKEN, PAD_TOKEN
+from .constants import UNK_TOKEN, DEFAULT_UNK_ID, EOS_TOKEN, BOS_TOKEN, PAD_TOKEN
 
 
 class Vocabulary:
@@ -118,7 +115,7 @@ class Vocabulary:
 
         :param arrays: 2D array containing indices
         :param cut_at_eos: cut the decoded sentences at the first <eos>
-        :return: list of list of strings (tokens)
+        :return: list of lists of strings (tokens)
         """
         sentences = []
         for array in arrays:
@@ -137,8 +134,7 @@ def build_vocab(field: str, max_size: int, min_freq: int, dataset: Dataset,
     :param max_size: maximum size of vocabulary
     :param min_freq: minimum frequency for an item to be included
     :param dataset: dataset to load data for field from
-    :param vocab_file: file to store the vocabulary,
-        if not None, load vocabulary from here
+    :param vocab_file: file to store the vocabulary, if not None, load vocabulary from here
     :return: Vocabulary created from either `dataset` or `vocab_file`
     """
 

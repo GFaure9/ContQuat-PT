@@ -1,32 +1,34 @@
-# coding: utf-8
 """
-Data module
+Data module.
+Adapted from original code at https://github.com/BenSaunders27/ProgressiveTransformersSLP
 """
+
 import sys
 import os
+import io
+import torch
 import os.path
 from typing import Optional
-import io
-
-# from torchtext.datasets import TranslationDataset
 from torchtext import data
 from torchtext.data import Dataset, Iterator, Field
-import torch
 
-from .constants import UNK_TOKEN, EOS_TOKEN, BOS_TOKEN, PAD_TOKEN, TARGET_PAD
+from .constants import UNK_TOKEN, PAD_TOKEN, TARGET_PAD
 from .vocabulary import build_vocab, Vocabulary
 
+
+# -------- Important information --------
 # Load the Regression Data
 # Data format should be parallel .txt files for src, trg and files
 # Each line of the .txt file represents a new sequence, in the same order in each file
 # src file should contain a new source input on each line
 # trg file should contain skeleton data, with each line a new sequence, each frame following on from the previous
 # Joint values were divided by 3 to move to the scale of -1 to 1
-# Each joint value should be separated by a space; " "
-# Each frame is partioned using the known trg_size length, which includes all joints (In 2D or 3D) and the counter
+# Each joint value should be separated by a space " "
+# Each frame is partitioned using the known trg_size length, which includes all joints (In 2D or 3D) and the counter
 # Files file should contain the name of each sequence on a new line
-def load_data(cfg: dict) -> (Dataset, Dataset, Optional[Dataset],
-                                  Vocabulary, Vocabulary):
+# ---------------------------------------
+
+def load_data(cfg: dict) -> (Dataset, Dataset, Optional[Dataset], Vocabulary, Vocabulary):
     """
     Load train, dev and optionally test data as specified in configuration.
     Vocabularies are created from the training set with a limit of `voc_limit`
@@ -50,7 +52,7 @@ def load_data(cfg: dict) -> (Dataset, Dataset, Optional[Dataset],
     src_lang = data_cfg["src"]
     trg_lang = data_cfg["trg"]
     files_lang = data_cfg.get("files", "files")
-    sentences_emb_lang = data_cfg.get("sentences_embeddings", None)  # added by me (GF)
+    sentences_emb_lang = data_cfg.get("sentences_embeddings", None)
     # Train, Dev and Test Path
     train_path = data_cfg["train"]
     dev_path = data_cfg["dev"]
@@ -68,11 +70,16 @@ def load_data(cfg: dict) -> (Dataset, Dataset, Optional[Dataset],
     tok_fun = lambda s: list(s) if level == "char" else s.split()
 
     # Source field is a tokenised version of the source words
-    src_field = data.Field(init_token=None, eos_token=EOS_TOKEN,
-                           pad_token=PAD_TOKEN, tokenize=tok_fun,
-                           batch_first=True, lower=lowercase,
-                           unk_token=UNK_TOKEN,
-                           include_lengths=True)
+    src_field = data.Field(
+        init_token=None,
+        eos_token=EOS_TOKEN,
+        pad_token=PAD_TOKEN,
+        tokenize=tok_fun,
+        batch_first=True,
+        lower=lowercase,
+        unk_token=UNK_TOKEN,
+        include_lengths=True
+    )
 
     # Files field is just a raw text field
     files_field = data.RawField()
@@ -87,14 +94,16 @@ def load_data(cfg: dict) -> (Dataset, Dataset, Optional[Dataset],
 
     # Creating a regression target field
     # Pad token is a vector of output size, containing the constant TARGET_PAD
-    reg_trg_field = data.Field(sequential=True,
-                               use_vocab=False,
-                               dtype=torch.float32,
-                               batch_first=True,
-                               include_lengths=False,
-                               pad_token=torch.ones((trg_size,))*TARGET_PAD,
-                               preprocessing=tokenize_features,
-                               postprocessing=stack_features,)
+    reg_trg_field = data.Field(
+        sequential=True,
+        use_vocab=False,
+        dtype=torch.float32,
+        batch_first=True,
+        include_lengths=False,
+        pad_token=torch.ones((trg_size,))*TARGET_PAD,
+        preprocessing=tokenize_features,
+        postprocessing=stack_features,
+    )
 
     # Field for sentence embeddings - added by me (GF)
     def parse_sentence_embedding_line(s):
@@ -117,34 +126,41 @@ def load_data(cfg: dict) -> (Dataset, Dataset, Optional[Dataset],
         fields = (src_field, reg_trg_field, files_field, sent_emb_field)
 
     # Create the Training Data, using the SignProdDataset
-    train_data = SignProdDataset(path=train_path,
-                                    exts=extensions,
-                                    fields=fields,
-                                    trg_size=trg_size,
-                                    skip_frames=skip_frames,
-                                    filter_pred=
-                                    lambda x: len(vars(x)['src'])
-                                    <= max_sent_length
-                                    and len(vars(x)['trg'])
-                                    <= max_sent_length)
+    train_data = SignProdDataset(
+        path=train_path,
+        exts=extensions,
+        fields=fields,
+        trg_size=trg_size,
+        skip_frames=skip_frames,
+        filter_pred=
+        lambda x: len(vars(x)['src'])
+        <= max_sent_length
+        and len(vars(x)['trg'])
+        <= max_sent_length
+    )
 
     src_max_size = data_cfg.get("src_voc_limit", sys.maxsize)
     src_min_freq = data_cfg.get("src_voc_min_freq", 1)
     src_vocab_file = data_cfg.get("src_vocab", None)
-    src_vocab = build_vocab(field="src", min_freq=src_min_freq,
-                            max_size=src_max_size,
-                            dataset=train_data, vocab_file=src_vocab_file)
+    src_vocab = build_vocab(
+        field="src",
+        dataset=train_data,
+        vocab_file=src_vocab_file,
+        min_freq=src_min_freq, max_size=src_max_size,
+    )
 
     # Create a target vocab just as big as the required target vector size -
     # So that len(trg_vocab) is # of joints + 1 (for the counter)
     trg_vocab = [None]*trg_size
 
     # Create the Validation Data
-    dev_data = SignProdDataset(path=dev_path,
-                                  exts=extensions,
-                                  trg_size=trg_size,
-                                  fields=fields,
-                                  skip_frames=skip_frames)
+    dev_data = SignProdDataset(
+        path=dev_path,
+        exts=extensions,
+        trg_size=trg_size,
+        fields=fields,
+        skip_frames=skip_frames
+    )
 
     # Create the Testing Data
     test_data = SignProdDataset(
@@ -152,17 +168,16 @@ def load_data(cfg: dict) -> (Dataset, Dataset, Optional[Dataset],
         exts=extensions,
         trg_size=trg_size,
         fields=fields,
-        skip_frames=skip_frames)
+        skip_frames=skip_frames
+    )
 
     src_field.vocab = src_vocab
 
     return train_data, dev_data, test_data, src_vocab, trg_vocab
 
 
-# pylint: disable=global-at-module-level
 global max_src_in_batch, max_tgt_in_batch
 
-# pylint: disable=unused-argument,global-variable-undefined
 def token_batch_size_fn(new, count, sofar):
     """Compute batch size based on number of tokens (+padding)."""
     global max_src_in_batch, max_tgt_in_batch
@@ -191,9 +206,9 @@ def make_data_iter(dataset: Dataset,
     :param batch_size: size of the batches the iterator prepares
     :param batch_type: measure batch size by sentence count or by token count
     :param train: whether it's training time, when turned off,
-        bucketing, sorting within batches and shuffling is disabled
+                  bucketing, sorting within batches and shuffling is disabled
     :param shuffle: whether to shuffle the data before each epoch
-        (no effect if set to True for testing)
+                    (no effect if set to True for testing)
     :return: torchtext iterator
     """
 
@@ -215,9 +230,9 @@ def make_data_iter(dataset: Dataset,
 
     return data_iter
 
+
 # Main Dataset Class
 
-# --- GF version to allow for taking into account optional sentence embeddings
 class SignProdDataset(data.Dataset):
     def __init__(self, path, exts, fields, trg_size, skip_frames=1, **kwargs):
         if not isinstance(fields[0], (tuple, list)):

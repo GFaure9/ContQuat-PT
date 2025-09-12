@@ -1,15 +1,12 @@
-# coding: utf-8
 """
 Collection of builder functions
 """
-from typing import Callable, Optional, Generator
-import math
 
 import torch
 from torch import nn
-from torch.optim.lr_scheduler import _LRScheduler, ReduceLROnPlateau, \
-    StepLR, ExponentialLR
+from torch.optim.lr_scheduler import _LRScheduler, ReduceLROnPlateau, StepLR, ExponentialLR
 from torch.optim import Optimizer
+from typing import Callable, Optional, Generator
 
 from ..utils.helpers import ConfigurationError
 

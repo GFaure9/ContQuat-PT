@@ -1,12 +1,15 @@
-# coding: utf-8
 """
-Module to implement training loss
+Implementation of different training losses:
+- RegLoss: L_SLP := MSE or L1 loss
+- RootQuatLoss: L_SLP := L_Geodesic + MSE_root_joint
+- LossWithSBERTCont: L_tot := L_SLP + sca * L_SBERTSupCont
+- LossWithSupCont: L_tot := L_SLP + sca * L_GlossSupCont
 """
 
 import torch
-from torch import nn, Tensor
-from torch import vmap
 import torch.nn.functional as F
+from torch import nn, Tensor
+# from torch import vmap
 
 
 class LossWithSBERTCont(nn.Module):
@@ -41,8 +44,10 @@ class LossWithSBERTCont(nn.Module):
             outputs_decoder_self_att_layers=outputs_decoder_self_att_layers,
             sbert_embeddings_batch=sbert_embeddings_batch,
         )
-        print(
-            f"Target Loss: {trg_loss / batch_normalization_compensation_factor} | Contrastive Loss: {self.sbert_cont_loss_scale * sbert_cont_loss}")
+
+        # print(f"Target Loss: {trg_loss / batch_normalization_compensation_factor} "
+        #       f"| Contrastive Loss: {self.sbert_cont_loss_scale * sbert_cont_loss}")
+
         return trg_loss + batch_normalization_compensation_factor * self.sbert_cont_loss_scale * sbert_cont_loss
 
 
@@ -156,8 +161,10 @@ class LossWithSupCont(nn.Module):
             outputs_decoder_self_att_layers=outputs_decoder_self_att_layers,
             glosses_ids_batch=glosses_ids_batch,
         )
-        print(
-            f"Target Loss: {trg_loss / batch_normalization_compensation_factor} | Contrastive Loss: {self.sup_cont_loss_scale * sup_cont_loss}")
+
+        # print(f"Target Loss: {trg_loss / batch_normalization_compensation_factor} "
+        #       f"| Contrastive Loss: {self.sup_cont_loss_scale * sup_cont_loss}")
+
         return trg_loss + batch_normalization_compensation_factor * self.sup_cont_loss_scale * sup_cont_loss
 
 
@@ -196,7 +203,9 @@ class SupervisedContrastiveLoss(nn.Module):
     Supervised Contrastive loss (computed on a batch) defined as:
 
             L_supCont :=
-            sum_{i=0^I}( -1/|A(i)| sum_{a in A(i)}( exp(zi za / tau) / sum_{b in B(i)}( exp(zi zb / tau) ) ) )
+            sum_{i=0^I}(
+                log( 1/|A(i)| sum_{a in A(i)}( exp(zi za / tau) / sum_{b in B(i)}( exp(zi zb / tau) ) ) )
+            )
 
     Where:
         - i=0, 1, ..., I are the indices of anchor words of gloss/text inputs corresponding to sequences embeddings of the batch
@@ -206,7 +215,9 @@ class SupervisedContrastiveLoss(nn.Module):
         - tau is a scalar temperature parameter
 
     (same as in "A Data-Driven Representation for Sign Language Production" Walsh et al. (2024)
-    https://doi.org/10.48550/arXiv.2404.11499)
+    https://doi.org/10.48550/arXiv.2404.11499
+    /!\ but with the logarithm of the original version of "Supervised Contrastive Learning" Khosla et al.(2020)
+    https://doi.org/10.48550/arXiv.2004.11362)
 
     Objectives:
     overcome natural variation between signers or for the same signer /
@@ -252,7 +263,7 @@ class SupervisedContrastiveLoss(nn.Module):
                 mask[random_idx] = True  # put back zi in mask to exclude it with ~mask
                 Bi = z_batch[~mask]
 
-                # ==== TEST TO HAVE LOWER VALUES (L2 NORMALIZATION)
+                # L2 normalization
                 zi = F.normalize(zi, dim=-1)
                 Ai = F.normalize(Ai, dim=-1)
                 Bi = F.normalize(Bi, dim=-1)
@@ -261,15 +272,14 @@ class SupervisedContrastiveLoss(nn.Module):
             if len(Ai) == 0 or len(Bi) == 0:
                 continue  # skipping the ID {i}
 
-            # ==== TEST TO HAVE LOWER VALUES (ONLY WHEN AT LEAST 20% OF BATCH SHARE ANCHOR WORD)
+            # uncomment to only compute the per-anchor sub-loss if 20% of batch sequences contain the anchor gloss
             # if len(Ai) < 0.2 * len(z_batch):
             #     continue
 
-
             zi_dot_Ai = torch.sum(zi.flatten() * Ai.flatten(1) / self.tau, dim=1)  # shape = (len(Ai),)
             zi_dot_Bi = torch.sum(zi.flatten() * Bi.flatten(1) / self.tau, dim=1)  # shape = (len(Bi),)
-            s += torch.logsumexp(zi_dot_Ai, dim=0) - torch.logsumexp(zi_dot_Bi, dim=0) - torch.log(
-                torch.tensor(len(Ai), dtype=torch.float32))
+            s += (torch.logsumexp(zi_dot_Ai, dim=0) - torch.logsumexp(zi_dot_Bi, dim=0)
+                  - torch.log(torch.tensor(len(Ai), dtype=torch.float32)))
 
         return -s  # /!\ the `-` (minus) is very important since we want that min(L_supCont) maximizes the zi . za
 
@@ -362,8 +372,10 @@ class MeanGeodesicDistance(nn.Module):
                     and     V' = (q1', ..., qi', ..., qN')
     """
 
-    def __init__(self,
-                 reduction: str = "sum"):  # /!\ NO "mean" reduction because division by N_batch is done in TrainManager _train_batch() method
+    def __init__(
+            self,
+            reduction: str = "sum"  # /!\ NO "mean" reduction because division by N_batch is done in TrainManager _train_batch() method
+    ):
         super(MeanGeodesicDistance, self).__init__()
         self.reduction = reduction
 
@@ -417,7 +429,6 @@ class RegLoss(nn.Module):
         self.target_pad = target_pad
         self.loss_scale = model_cfg.get("loss_scale", 1.0)
 
-    # pylint: disable=arguments-differ
     def forward(self, preds, targets):
 
         loss_mask = (targets != self.target_pad)
@@ -434,65 +445,3 @@ class RegLoss(nn.Module):
             loss = loss * self.loss_scale
 
         return loss
-
-
-if __name__ == "__main__":
-    tests = [
-        # "supcon",
-        "sbertcon",
-    ]
-
-    import time
-
-    for test in tests:
-
-        # ---- Testing L_supCont
-        if test == "supcon" in tests:
-            print(f"------ TEST: '{test}' Loss")
-
-            supContLoss = SupervisedContrastiveLoss(tau=0.07)
-            batch_size = 128
-            Zs = 2 * torch.rand(batch_size, 100, 512) - 1  # shape is (M_batch, T, z_dim) | values in [-1, 1]
-            glosses_indices = torch.randint(1, 51, (
-            batch_size, 15))  # e.g. vocabulary size = 50 | gloss sequence max size is 15
-
-            print(f"\nEmbeddings Zs:\n{Zs}\nShape: {Zs.shape}")
-            print(f"\n\nGlosses sequences IDs:\n{glosses_indices}\nShape: {glosses_indices.shape}")
-
-            start = time.time()
-            print("\n\nL_supCont : ", supContLoss(Zs, glosses_indices))
-            print(f"Computation time for LsupCont: {time.time() - start:.4f} seconds")
-
-            # ---- Testing L_supCont on aggregated outputs (multiple batches)
-            supContLoss_agg = SupContDecoderSA(tau=0.07)
-            num_agg = 2
-            Zs_agg = 2 * torch.rand(num_agg, batch_size, 100, 512) - 1
-
-            start = time.time()
-            print("\n\nL_supCont Aggregated: ", supContLoss_agg(Zs_agg, glosses_indices))
-            print(f"Computation time for num_agg={num_agg}: {time.time() - start:.4f} seconds")
-
-        # --- Testing L_sBERTCon
-        if test == "sbertcon":
-            print(f"------ TEST: '{test}' Loss")
-
-            sBERTContLoss = SBERTSimilarityContrastiveLoss()
-            batch_size = 128
-            Zs = 2 * torch.rand(batch_size, 100, 512) - 1  # shape is (M_batch, T, z_dim) | values in [-1, 1]
-            sbert_embeddings_batch = torch.rand(batch_size, 384)  # e.g. (M_batch, 384)
-
-            print(f"\nEmbeddings Zs:\n{Zs}\nShape: {Zs.shape}")
-            print(f"\n\n(sentences)SBERT embeddings:\n{sbert_embeddings_batch}\nShape: {sbert_embeddings_batch.shape}")
-
-            start = time.time()
-            print("\n\nL_sbertCont : ", sBERTContLoss(Zs, sbert_embeddings_batch))
-            print(f"Computation time for L_sbertCont: {time.time() - start:.4f} seconds")
-
-            # ---- Testing L_sbertCont on aggregated outputs (multiple batches)
-            sBERTContLoss_agg = SBERTContDecoderSA()
-            num_agg = 2
-            Zs_agg = 2 * torch.rand(num_agg, batch_size, 100, 512) - 1
-
-            start = time.time()
-            print("\n\nL_sbertCont Aggregated: ", sBERTContLoss_agg(Zs_agg, sbert_embeddings_batch))
-            print(f"Computation time for num_agg={num_agg}: {time.time() - start:.4f} seconds")

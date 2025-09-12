@@ -1,13 +1,34 @@
+"""
+Function for autoregressive computation of Transformer decoder outputs from the encoder output.
+Used for predictions (once the model is already trained).
+
+More precisely:
+    1) the 1st frame of the target pose sequence and the Transformer encoder output are given
+       as inputs of the Transformer decoder to produce a 1st output sequence of shape (B, 1, D)d
+
+    2) the last frame of the output sequence is taken and added to the 1st frame, and the
+       resulting sequence is given as input along with the encoder output to the Transformer decoder to
+       produce a 2nd output sequence of shape (B, 2, D)
+
+    3) the last frame of this output sequence is taken and added to the 2 frames given as inputs in step 2),
+       and again passed as inputs to the decoder to produce a 3rd output sequence of shape (B, 3, D)
+
+    4) etc... this is repeated once reaching T and having a sequence of shape (B, T, D) made of all last frames
+       predictions of previous decoding steps
+
+Original code from https://github.com/BenSaunders27/ProgressiveTransformersSLP
+"""
+
 
 import torch
 import torch.nn.functional as F
-from torch import Tensor
 import numpy as np
+from torch import Tensor
 
 from .decoders import Decoder
 from .embeddings import Embeddings
 
-# pylint: disable=unused-argument
+
 def greedy(
         src_mask: Tensor,
         embed: Embeddings,
@@ -15,18 +36,15 @@ def greedy(
         encoder_output: Tensor,
         trg_input: Tensor,
         model,
-        ) -> (np.array, np.array):
+) -> (np.array, np.array):
     """
     Special greedy function for transformer, since it works differently.
     The transformer remembers all previous states and attends to them.
 
     :param src_mask: mask for source inputs, 0 for positions after </s>
     :param embed: target embedding
-    :param bos_index: index of <s> in the vocabulary
-    :param max_output_length: maximum length for the hypotheses
     :param decoder: decoder to use for greedy decoding
     :param encoder_output: encoder hidden states for attention
-    :param encoder_hidden: encoder final state (unused in Transformer)
     :return:
         - stacked_output: output hypotheses (2d array of indices),
         - stacked_attention_scores: attention scores (3d array)
@@ -50,7 +68,6 @@ def greedy(
         ys = ys[:,:,-1:]
 
     for i in range(max_output_length):
-
         # ys here is the input
         # Drive the timing by giving the GT timing - add in the counter to the last column
 
@@ -95,4 +112,3 @@ def greedy(
             ys_out = torch.cat([ys_out, out[:,-1:,:]], dim=1)
 
     return ys_out, None
-

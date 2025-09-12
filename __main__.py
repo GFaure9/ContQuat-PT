@@ -1,13 +1,10 @@
+# todo: clean / comment / adapt imports
 import argparse
 
 from .training import train, test
 
 
 def main():
-
-    # Example options:
-    # train ./Configs/Base.yaml
-    # test ./Configs/Base.yaml
 
     ap = argparse.ArgumentParser("Progressive Transformers")
 

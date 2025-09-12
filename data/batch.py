@@ -1,7 +1,6 @@
-# coding: utf-8
-
 """
 Implementation of a mini-batch.
+Adapted from original code at https://github.com/BenSaunders27/ProgressiveTransformersSLP
 """
 
 import torch
@@ -9,8 +8,10 @@ import torch.nn.functional as F
 
 from .constants import TARGET_PAD
 
+
 class Batch:
-    """Object for holding a batch of data with mask during training.
+    """
+    Object for holding a batch of data with mask during training.
     Input is a batch from a torch text iterator.
     """
 
@@ -21,13 +22,10 @@ class Batch:
         This batch extends torch text's batch attributes with src and trg
         length, masks, number of non-padded tokens in trg.
         Furthermore, it can be sorted by src length.
-
-        :param torch_batch:
-        :param pad_index:
-        :param use_cuda:
         """
         self.src, self.src_lengths = torch_batch.src
-        self.sent_emb = getattr(torch_batch, 'sent_emb', None)  # added by me (GF) | to access sentences embeddings if wanted (will be None if no attribute torch_batch.sent_emb)
+        # to access sentences embeddings if wanted (will be None if no attribute torch_batch.sent_emb)
+        self.sent_emb = getattr(torch_batch, 'sent_emb', None)
         self.src_mask = (self.src != pad_index).unsqueeze(1)
         self.nseqs = self.src.size(0)
         self.trg_input = None
@@ -89,8 +87,6 @@ class Batch:
     def _make_cuda(self):
         """
         Move the batch to GPU
-
-        :return:
         """
         self.src = self.src.cuda()
         self.src_mask = self.src_mask.cuda()
@@ -100,6 +96,5 @@ class Batch:
             self.trg = self.trg.cuda()
             self.trg_mask = self.trg_mask.cuda()
 
-        # added by me (GF)
         if self.sent_emb is not None:
             self.sent_emb = self.sent_emb.cuda()

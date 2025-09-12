@@ -1,14 +1,25 @@
-# -*- coding: utf-8 -*-
+"""
+Classes to define Transformer encoder and decoder layers.
+
+- Encoder layer:
+ x --> PositionalEncoding(.) --> Normalize(.) --> Self-Attention(.) --> Dropout(.) + x --> FFN(.)
+
+- Decoder layer:
+ x --> Normalize(.) --> Self-Attention(.) --> Dropout(.) + x
+ --> h1=Normalize(.) --> Cross-Attention(y,.) --> Dropout(.) + h1 --> FFN(.)
+
+Original code at https://github.com/BenSaunders27/ProgressiveTransformersSLP
+"""
 
 import math
 import torch
 import torch.nn as nn
 from torch import Tensor
 from typing import Tuple
+
 from ..data.constants import TARGET_PAD
 
 
-# pylint: disable=arguments-differ
 class MultiHeadedAttention(nn.Module):
 
     def __init__(self, num_heads: int, size: int, dropout: float = 0.1):
@@ -73,7 +84,6 @@ class MultiHeadedAttention(nn.Module):
         return output
 
 
-# pylint: disable=arguments-differ
 class PositionwiseFeedForward(nn.Module):
 
     def __init__(self, input_size, ff_size, dropout=0.1):
@@ -93,7 +103,6 @@ class PositionwiseFeedForward(nn.Module):
         return self.pwff_layer(x_norm) + x
 
 
-# pylint: disable=arguments-differ
 class PositionalEncoding(nn.Module):
 
     def __init__(self,
@@ -139,7 +148,6 @@ class TransformerEncoderLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
         self.size = size
 
-    # pylint: disable=arguments-differ
     def forward(self, x: Tensor, mask: Tensor) -> Tensor:
 
         x_norm = self.layer_norm(x)
@@ -178,7 +186,6 @@ class TransformerDecoderLayer(nn.Module):
 
         self.decoder_trg_trg = decoder_trg_trg
 
-    # pylint: disable=arguments-differ
     def forward(self,
                 x: Tensor = None,
                 memory: Tensor = None,

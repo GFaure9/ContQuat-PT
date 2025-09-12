@@ -1,12 +1,11 @@
-from numpy import array, zeros, full, argmin, inf, ndim
-from scipy.spatial.distance import cdist
+"""
+Dynamic time warping (DTW) is used as a similarity measured between temporal sequences.
+Original DTW code found at https://github.com/pierre-rouanet/dtw
+"""
+
+from numpy import array, zeros, full, argmin, inf
 from math import isinf
 
-"""
-Dynamic time warping (DTW) is used as a similarity measured between temporal sequences. 
-Original DTW code found at https://github.com/pierre-rouanet/dtw
-
-"""
 
 # Apply DTW
 def dtw(x, y, dist, warp=1, w=inf, s=1.0):

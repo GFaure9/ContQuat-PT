@@ -1,44 +1,52 @@
+"""
+Defining the training manager class and functions to train and test the model.
+Adapted from original code at https://github.com/BenSaunders27/ProgressiveTransformersSLP
+"""
+
 import time
 import shutil
 import os
 import queue
 import json
 import random
-import numpy as np
-
-from pathlib import Path
-
 import torch
+import numpy as np
+from pathlib import Path
 from torch import Tensor
 from torch.utils.tensorboard import SummaryWriter
 from torchtext.data import Dataset
 
-from .architecture.model import build_model
+# -- Architecture imports
+from .architecture.model import Model, build_model
+from .architecture.builders import build_optimizer, build_scheduler, build_gradient_clipper
+
+# -- Data imports
 from .data.batch import Batch
-from .utils.helpers import  load_config, log_cfg, load_checkpoint, make_model_dir, \
-    make_logger, set_seed, symlink_update, ConfigurationError, get_latest_checkpoint
-from .architecture.model import Model
-from .prediction import validate_on_data
-from .losses.loss import RegLoss, RootQuatLoss
 from .data.data import load_data, make_data_iter
-from .architecture.builders import build_optimizer, build_scheduler, \
-    build_gradient_clipper
-from .data.constants import TARGET_PAD, PAD_TOKEN
-from .losses.loss import LossWithSupCont, LossWithSBERTCont
+from .data.constants import TARGET_PAD
 
-from .utils.plot_videos import plot_video,alter_DTW_timing
+# -- Losses imports
+from .losses.loss import RegLoss, RootQuatLoss, LossWithSupCont, LossWithSBERTCont
 
+# -- Predictions imports
+from .prediction import validate_on_data
+from .utils.helpers import  (
+load_config, log_cfg, make_logger,
+load_checkpoint, get_latest_checkpoint,
+make_model_dir, ConfigurationError,
+set_seed, symlink_update
+)
+
+# -- Utils imports
 from utils.visualization import make_histograms, make_box_plots, make_skel_video, stack_videos
-from utils.skeleletal_structures_helper import ORIGINAL_S2SL_SKEL, ORIGINAL_S2SL_SKEL_INVERTED_HANDS, generate_t_pose
-from utils.skeletal_representations import cartesian_to_quaternion_pose, quaternion_to_cartesian_pose
+from utils.skeleletal_structures_helper import ORIGINAL_S2SL_SKEL
 
 
 class TrainManager:
 
     def __init__(self, model: Model, config: dict, test=False) -> None:
 
-        # added by me (GF) to retrieve mean bones lengths in the case there is
-        # =====================================================================
+        # retrieve mean bones lengths in the case there is
         self.mean_bones_lengths = None
         if "mean_bones_lengths" in config["data"].keys():
             bones_lengths_fpath = config["data"]["mean_bones_lengths"]
@@ -46,7 +54,6 @@ class TrainManager:
                 self.mean_bones_lengths = np.loadtxt(bones_lengths_fpath)  # shape=(N_bones,)
             except Exception as e:
                 print(f"Could not load mean bones lengths from {bones_lengths_fpath} due to {e}")
-        # =====================================================================
 
         train_config = config["training"]
         model_dir = train_config["model_dir"]
@@ -59,9 +66,11 @@ class TrainManager:
             model_continue = True
 
         # files for logging and storing
-        self.model_dir = make_model_dir(train_config["model_dir"],
-                                        overwrite=train_config.get("overwrite", False),
-                                        model_continue=model_continue)
+        self.model_dir = make_model_dir(
+            train_config["model_dir"],
+            overwrite=train_config.get("overwrite", False),
+            model_continue=model_continue
+        )
         # Build logger
         self.logger = make_logger(model_dir=self.model_dir)
         self.logging_freq = train_config.get("logging_freq", 100)
@@ -79,14 +88,14 @@ class TrainManager:
         self.normalization = "batch"  # batch loss will be divided by number of sequence in the batch
 
         # New Regression loss - depending on config
-        # adaptation by me (GF) to differentiate between .quat and .skels targets
+        # differentiate between .quat and .skels targets
         trg_ext = config["data"]["trg"]
         if trg_ext == "quat":
             self.loss = RootQuatLoss(cfg=config, target_pad=self.target_pad)
         else:
             self.loss = RegLoss(cfg=config, target_pad=self.target_pad)
 
-        # adaptation by me (GF) to incorporate supervised contrastive loss
+        # incorporate supervised contrastive loss
         if "supervised_contrastive_loss" in config["training"].keys():
             if config["training"]["supervised_contrastive_loss"]:
                 self.loss = LossWithSupCont(
@@ -95,7 +104,7 @@ class TrainManager:
                     compensate_batch_normalization=(self.normalization == "batch")
                 )
 
-        # adaptation by me (GF) to incorporate sentence embeddings similarity-based contrastive loss
+        # incorporate sentence embeddings similarity-based contrastive loss
         if "sbert_contrastive_loss" in config["training"].keys():
             if config["training"]["sbert_contrastive_loss"]:
                 self.loss = LossWithSBERTCont(
@@ -117,15 +126,12 @@ class TrainManager:
 
         self.val_on_train = config["data"].get("val_on_train", False)
 
-        # TODO - Include Back Translation
         self.eval_metric = train_config.get("eval_metric", "dtw").lower()
-        if self.eval_metric not in ['bleu', 'chrf', "dtw"]:
+        if self.eval_metric not in ["dtw"]:
             raise ConfigurationError("Invalid setting for 'eval_metric', "
-                                     "valid options: 'bleu', 'chrf', 'DTW'")
-        self.early_stopping_metric = train_config.get("early_stopping_metric",
-                                                       "eval_metric")
+                                     "valid options: 'DTW'")
+        self.early_stopping_metric = train_config.get("early_stopping_metric", "eval_metric")
 
-        # if we schedule after BLEU/chrf, we want to maximize it, else minimize
         # early_stopping_metric decides on how to find the early stopping point:
         # ckpts are written when there's a new high/low score for this metric
         if self.early_stopping_metric in ["loss","dtw"]:
@@ -139,7 +145,8 @@ class TrainManager:
             config=train_config,
             scheduler_mode="min" if self.minimize_metric else "max",
             optimizer=self.optimizer,
-            hidden_size=config["model"]["encoder"]["hidden_size"])
+            hidden_size=config["model"]["encoder"]["hidden_size"]
+        )
 
         # data & batch handling
         self.level = "word"
@@ -175,7 +182,7 @@ class TrainManager:
         ## Checkpoint restart
         # If continuing
         if model_continue:
-            if not test:  # added by me (GF) since when we test we already provide a built model (using a .ckpt)
+            if not test:  # when we test we already provide a built model (using a .ckpt)
                 # Get the latest checkpoint
                 ckpt = get_latest_checkpoint(model_dir)
                 if ckpt is None:
@@ -227,8 +234,9 @@ class TrainManager:
                 try:
                     os.remove(to_delete)
                 except FileNotFoundError:
-                    self.logger.warning("Wanted to delete old checkpoint %s but "
-                                        "file does not exist.", to_delete)
+                    self.logger.warning(
+                        "Wanted to delete old checkpoint %s but file does not exist.",to_delete
+                    )
 
             self.ckpt_best_queue.put(model_path)
 
@@ -247,8 +255,9 @@ class TrainManager:
                 try:
                     os.remove(to_delete)
                 except FileNotFoundError:
-                    self.logger.warning("Wanted to delete old checkpoint %s but "
-                                        "file does not exist.", to_delete)
+                    self.logger.warning(
+                        "Wanted to delete old checkpoint %s but file does not exist.", to_delete
+                    )
 
             self.ckpt_queue.put(model_path)
 
@@ -269,8 +278,7 @@ class TrainManager:
         self.model.load_state_dict(model_checkpoint["model_state"])
         self.optimizer.load_state_dict(model_checkpoint["optimizer_state"])
 
-        if model_checkpoint["scheduler_state"] is not None and \
-                self.scheduler is not None:
+        if model_checkpoint["scheduler_state"] is not None and self.scheduler is not None:
             # Load the scheduler state
             self.scheduler.load_state_dict(model_checkpoint["scheduler_state"])
 
@@ -285,13 +293,14 @@ class TrainManager:
             self.model.cuda()
 
     # Train and validate function
-    def train_and_validate(self, train_data: Dataset, valid_data: Dataset) \
-            -> None:
+    def train_and_validate(self, train_data: Dataset, valid_data: Dataset) -> None:
         # Make training iterator
-        train_iter = make_data_iter(train_data,
-                                    batch_size=self.batch_size,
-                                    batch_type=self.batch_type,
-                                    train=True, shuffle=self.shuffle)
+        train_iter = make_data_iter(
+            train_data,
+            batch_size=self.batch_size,
+            batch_type=self.batch_type,
+            train=True, shuffle=self.shuffle
+        )
 
         val_step = 0
         if self.gaussian_noise:
@@ -315,7 +324,10 @@ class TrainManager:
             # If Gaussian Noise, extract STDs for each joint position
             if self.gaussian_noise:
                 if len(all_epoch_noise) != 0:
-                    self.model.out_stds = torch.mean(torch.stack(([noise.std(dim=[0]) for noise in all_epoch_noise])),dim=-2)
+                    self.model.out_stds = torch.mean(
+                        torch.stack(([noise.std(dim=[0]) for noise in all_epoch_noise])),
+                        dim=-2
+                    )
                 else:
                     self.model.out_stds = None
                 all_epoch_noise = []
@@ -325,9 +337,11 @@ class TrainManager:
                 self.model.train()
 
                 # create a Batch object from torchtext batch
-                batch = Batch(torch_batch=batch,
-                              pad_index=self.pad_index,
-                              model=self.model)
+                batch = Batch(
+                    torch_batch=batch,
+                    pad_index=self.pad_index,
+                    model=self.model
+                )
 
                 update = count == 0
                 # Train the model on a batch
@@ -353,11 +367,13 @@ class TrainManager:
                     elapsed = time.time() - start - total_valid_duration
                     elapsed_tokens = self.total_tokens - start_tokens
                     self.logger.info(
-                        "Epoch %3d Step: %8d Batch Loss: %12.6f "
-                        "Tokens per Sec: %8.0f, Lr: %.6f",
-                        epoch_no + 1, self.steps, batch_loss,
+                        "Epoch %3d Step: %8d Batch Loss: %12.6f Tokens per Sec: %8.0f, Lr: %.6f",
+                        epoch_no + 1,
+                        self.steps,
+                        batch_loss,
                         elapsed_tokens / elapsed,
-                        self.optimizer.param_groups[0]["lr"])
+                        self.optimizer.param_groups[0]["lr"]
+                    )
                     start = time.time()
                     total_valid_duration = 0
                     start_tokens = self.total_tokens
@@ -372,14 +388,12 @@ class TrainManager:
                         validate_on_data(
                             batch_size=self.eval_batch_size,
                             data=valid_data,
-                            eval_metric=self.eval_metric,
                             model=self.model,
                             max_output_length=self.max_output_length,
                             loss_function=self.loss,
                             batch_type=self.eval_batch_type,
-                            type="val",
                             bones_lengths=self.mean_bones_lengths,
-                            only_training_metrics=True,  # added by me (GF)
+                            only_training_metrics=True,
                         )
 
                     val_step += 1
@@ -403,27 +417,12 @@ class TrainManager:
                         self.best_ckpt_iteration = self.steps
                         self.logger.info(
                             'Hooray! New best validation result [%s]!',
-                            self.early_stopping_metric)
+                            self.early_stopping_metric
+                        )
                         if self.ckpt_queue.maxsize > 0:
                             self.logger.info("Saving new checkpoint.")
                             new_best = True
                             self._save_checkpoint(type="best")
-
-                        # Commented by GF (to avoid saving videos while training) --> uncomment to get back to the original code
-                        # ===================================================
-                        # Display these sequences, in this index order
-                        # display = list(range(0, len(valid_hypotheses), int(np.ceil(len(valid_hypotheses) / 13.15))))
-                        # self.produce_validation_video(
-                        #     output_joints=valid_hypotheses,
-                        #     inputs=valid_inputs,
-                        #     references=valid_references,
-                        #     model_dir=self.model_dir,
-                        #     steps=self.steps,
-                        #     display=display,
-                        #     type="val_inf",
-                        #     file_paths=valid_file_paths,
-                        # )
-                        # ===================================================
 
                     self._save_checkpoint(type="every")
 
@@ -433,83 +432,40 @@ class TrainManager:
                     # append to validation report
                     self._add_report(
                         valid_score=valid_score, valid_loss=valid_loss,
-                        eval_metric=self.eval_metric,
-                        new_best=new_best, report_type="val",)
+                        new_best=new_best,
+                        report_type="val"
+                    )
 
                     valid_duration = time.time() - valid_start_time
                     total_valid_duration += valid_duration
                     self.logger.info(
                         'Validation result at epoch %3d, step %8d: Val DTW Score: %6.2f, '
                         'loss: %8.4f,  duration: %.4fs',
-                            epoch_no+1, self.steps, valid_score,
-                            valid_loss, valid_duration)
+                        epoch_no+1, self.steps, valid_score,
+                        valid_loss, valid_duration
+                    )
 
                 if self.stop:
                     break
             if self.stop:
                 self.logger.info(
                     'Training ended since minimum lr %f was reached.',
-                     self.learning_rate_min)
+                     self.learning_rate_min
+                )
                 break
 
-            self.logger.info('Epoch %3d: total training loss %.5f', epoch_no+1,
-                             epoch_loss)
+            self.logger.info(
+                'Epoch %3d: total training loss %.5f', epoch_no+1, epoch_loss
+            )
         else:
             self.logger.info('Training ended after %3d epochs.', epoch_no+1)
-        self.logger.info('Best validation result at step %8d: %6.2f %s.',
-                         self.best_ckpt_iteration, self.best_ckpt_score,
-                         self.early_stopping_metric)
+        self.logger.info(
+            'Best validation result at step %8d: %6.2f %s.',
+            self.best_ckpt_iteration, self.best_ckpt_score,
+             self.early_stopping_metric
+        )
 
         self.tb_writer.close()  # close Tensorboard writer
-
-    # Produce the video of Phoenix MTC joints
-    def produce_validation_video(self,output_joints, inputs, references, display, model_dir, type, steps="", file_paths=None):
-
-        # If not at test
-        if type != "test":
-            dir_name = model_dir + "/videos/Step_{}/".format(steps)
-            if not os.path.exists(model_dir + "/videos/"):
-                os.mkdir(model_dir + "/videos/")
-
-        # If at test time
-        elif type == "test":
-            dir_name = model_dir + "/test_videos/"
-
-        # Create model video folder if not exist
-        if not os.path.exists(dir_name):
-            os.mkdir(dir_name)
-
-        # For sequence to display
-        for i in display:
-
-            seq = output_joints[i]
-            ref_seq = references[i]
-            input = inputs[i]
-            # Write gloss label
-            gloss_label = input[0]
-            if input[1]!="</s>":
-                gloss_label += "_" + input[1]
-            if input[2]!="</s>":
-                gloss_label += "_" + input[2]
-
-            # Alter the dtw timing of the produced sequence, and collect the DTW score
-            timing_hyp_seq, ref_seq_count, dtw_score = alter_DTW_timing(seq, ref_seq)
-
-            video_ext = "{}_{}.mp4".format(gloss_label, "{0:.2f}".format(float(dtw_score)).replace(".", "_"))
-
-            if file_paths is not None:
-                sequence_ID = file_paths[i]
-            else:
-                sequence_ID = None
-
-            # Plot this sequences video
-            if "<" not in video_ext:
-                plot_video(joints=timing_hyp_seq,
-                           file_path=dir_name,
-                           video_name=video_ext,
-                           references=ref_seq_count,
-                           skip_frames=self.skip_frames,
-                           sequence_ID=sequence_ID)
 
     # Train the batch
     def _train_batch(self, batch: Batch, update: bool = True) -> Tensor:
@@ -525,7 +481,6 @@ class TrainManager:
         else:
             raise NotImplementedError("Only normalize by 'batch' or 'tokens'")
 
-        # todo(gf): since batch_loss is normalized here (loss/N_batch), check if redundant to compute the mean in `loss`
         norm_batch_loss = batch_loss / normalizer
         # division needed since loss.backward sums the gradients until updated
         norm_batch_multiply = norm_batch_loss / self.batch_multiplier
@@ -550,8 +505,13 @@ class TrainManager:
 
         return norm_batch_loss, noise
 
-    def _add_report(self, valid_score: float, valid_loss: float, eval_metric: str,
-                    new_best: bool = False, report_type: str = "val") -> None:
+    def _add_report(
+            self,
+            valid_score: float,
+            valid_loss: float,
+            new_best: bool = False,
+            report_type: str = "val"
+    ) -> None:
 
         current_lr = -1
         # ignores other param groups for now
@@ -567,18 +527,18 @@ class TrainManager:
                     "Steps: {} Loss: {:.5f}| DTW: {:.3f}|"
                     " LR: {:.6f} {}\n".format(
                         self.steps, valid_loss, valid_score,
-                        current_lr, "*" if new_best else ""))
+                        current_lr, "*" if new_best else ""
+                    )
+                )
 
     def _log_parameters_list(self) -> None:
         """
         Write all model parameters (name, shape) to the log.
         """
-        model_parameters = filter(lambda p: p.requires_grad,
-                                  self.model.parameters())
+        model_parameters = filter(lambda p: p.requires_grad, self.model.parameters())
         n_params = sum([np.prod(p.size()) for p in model_parameters])
         self.logger.info("Total params: %d", n_params)
-        trainable_params = [n for (n, p) in self.model.named_parameters()
-                            if p.requires_grad]
+        trainable_params = [n for (n, p) in self.model.named_parameters() if p.requires_grad]
         self.logger.info("Trainable parameters: %s", sorted(trainable_params))
         assert trainable_params
 
@@ -595,10 +555,8 @@ def train(cfg_file: str, ckpt=None) -> None:
     train_data, dev_data, test_data, src_vocab, trg_vocab = load_data(cfg=cfg)
 
     # Build the Progressive Transformer model
-    # added by be (GF) ------------
     sent_emb_size = None if "sent_emb" not in train_data.fields else len(train_data.examples[0].sent_emb)
-    # -----------------------------
-    model = build_model(cfg, src_vocab=src_vocab, trg_vocab=trg_vocab, sent_emb_size=sent_emb_size)  # added `sent_emb_size` (GF)
+    model = build_model(cfg, src_vocab=src_vocab, trg_vocab=trg_vocab, sent_emb_size=sent_emb_size)
 
     if ckpt is not None:
         use_cuda = cfg["training"].get("use_cuda", False)
@@ -617,15 +575,18 @@ def train(cfg_file: str, ckpt=None) -> None:
     # Train the model
     trainer.train_and_validate(train_data=train_data, valid_data=dev_data)
 
-    # Test the model with the best checkpoint (commented by GF --> separate training and testing)
+    # Test the model with the best checkpoint
     print("\n\n-------- Finished training! Launching test...")
     test(cfg_file, ckpt=None, save_skeletal_poses=True, produce_videos=True, n_videos=5)
 
-# pylint: disable-msg=logging-too-many-args
-def test(cfg_file, ckpt: str = None, save_skeletal_poses: bool = False, produce_videos: bool = False,
-         n_videos: int = 5) -> None:
-    # NB: I (GF) changed many things in this function (kept the general structure but added skel storage + video production, etc.)
-    # (similar to what I did for S2SL model)
+
+def test(
+        cfg_file,
+        ckpt: str = None,
+        save_skeletal_poses: bool = False,
+        produce_videos: bool = False,
+        n_videos: int = 5
+) -> dict:
 
     # Load the config file
     cfg = load_config(cfg_file)
@@ -655,49 +616,53 @@ def test(cfg_file, ckpt: str = None, save_skeletal_poses: bool = False, produce_
     # To produce testing results
     data_to_predict = {"test": test_data}
 
-    # To produce dev set results
+    # To produce dev set results (comment to only produce results on 'test' data and not 'dev')
     data_to_predict["dev"] = dev_data
 
     # Load model state from disk
     model_checkpoint = load_checkpoint(ckpt, use_cuda=use_cuda)
 
     # Build model and load parameters into it
-    # added by be (GF) ------------
     sent_emb_size = None if "sent_emb" not in train_data.fields else len(train_data.examples[0].sent_emb)
-    # -----------------------------
     model = build_model(cfg, src_vocab=src_vocab, trg_vocab=trg_vocab, sent_emb_size=sent_emb_size)  # added `sent_emb_size` (GF)
     model.load_state_dict(model_checkpoint["model_state"])
     # If cuda, set model as cuda
     if use_cuda:
         model.cuda()
 
-    # Set up trainer to produce videos
+    # Set up trainer
     trainer = TrainManager(model=model, config=cfg, test=True)
 
-    # Get training loss (added by GF)
-    # loss_func = RegLoss(cfg=cfg, target_pad=TARGET_PAD)
+    # Get training loss
     loss_func = trainer.loss
 
     # Set up scores dictionary
     scores = {}
     training_loss_name = cfg["training"]["loss"].lower()
     for subset in ["dev", "test"]:
+
+        # initialize scores dictionary
         scores[subset] = {
             training_loss_name: None,
+
             # --- Global DTW, DTW-MJE and PCK
             "dtw": {"mean": None, "std": None, "min": None, "max": None, "id_best": None, "values": []},
             "dtw_mje": {"mean": None, "std": None, "min": None, "max": None, "id_best": None, "values": []},
             "pck": {"mean": None, "std": None, "min": None, "max": None, "id_best": None, "values": []},
+
             # --- DTW by part
             "dtw_body": {"mean": None, "std": None, "min": None, "max": None, "id_best": None, "values": []},
             "dtw_left_hand": {"mean": None, "std": None, "min": None, "max": None, "id_best": None, "values": []},
             "dtw_right_hand": {"mean": None, "std": None, "min": None, "max": None, "id_best": None, "values": []},
+
             # --- DTW-MJE by part
             "dtw_mje_body": {"mean": None, "std": None, "min": None, "max": None, "id_best": None, "values": []},
             "dtw_mje_left_hand": {"mean": None, "std": None, "min": None, "max": None, "id_best": None, "values": []},
             "dtw_mje_right_hand": {"mean": None, "std": None, "min": None, "max": None, "id_best": None, "values": []},
+
             # --- BAE(Bone Angle Error)-based DTW
             "bae_dtw": {"mean": None, "std": None, "min": None, "max": None, "id_best": None, "values": []},
+
             # --- MBAE (Mean Bone Angle Error) | after correction by BAE-based DTW
             "mbae": {"mean": None, "std": None, "min": None, "max": None, "id_best": None, "values": []},
         }
@@ -708,19 +673,17 @@ def test(cfg_file, ckpt: str = None, save_skeletal_poses: bool = False, produce_
         # Validate for this data set
         score, loss, references, hypotheses, \
         inputs, all_dtw_scores, file_paths, all_pck_scores, all_dtw_scores_by_part, all_dtw_mje_by_part, \
-        all_bae_dtw_scores, all_mbae_scores, all_dtw_mje = \
-            validate_on_data(
-                model=model,
-                data=data_set,
-                batch_size=batch_size,
-                max_output_length=max_output_length,
-                eval_metric=eval_metric,
-                loss_function=loss_func,
-                batch_type=batch_type,
-                type="val" if data_set_name!="train" else "train_inf",
-                bones_lengths=trainer.mean_bones_lengths,  # added by me (GF)
-                skel_structure=ORIGINAL_S2SL_SKEL,  # added by me (GF)
-            )
+        all_bae_dtw_scores, all_mbae_scores, all_dtw_mje = validate_on_data(
+            model=model,
+            data=data_set,
+            batch_size=batch_size,
+            max_output_length=max_output_length,
+            loss_function=loss_func,
+            batch_type=batch_type,
+            bones_lengths=trainer.mean_bones_lengths,
+            skel_structure=ORIGINAL_S2SL_SKEL,
+        )
+
         # --------------------
         # N.B.:
         # `bones_lengths` is for 'quat' targets
@@ -737,79 +700,6 @@ def test(cfg_file, ckpt: str = None, save_skeletal_poses: bool = False, produce_
             scores[data_set_name][f"dtw_{part}"]["values"].extend(all_dtw_scores_by_part[part])
             scores[data_set_name][f"dtw_mje_{part}"]["values"].extend(all_dtw_mje_by_part[part])
 
-        # -------- TEMP TEST (to see if cartesian -> quaternion -> cartesian on ref works well)
-        # if model.use_quaternions:
-        #     references = torch.stack(references, dim=0)  # from list of N tensors (T, k) to tensor of shape (N, T, k)
-        #
-        #     N, T = references.shape[:-1]
-        #     x, counter = references[:, :, :-1], references[:, :, -1:]  # copy removing counter + copy counter
-        #     x_pts = x.reshape(N, T, -1, 3)  # reshape to (N_batch, T, num_pts, 3)
-        #
-        #     # === Transform to quaternion representation
-        #     references_quaternions = torch.zeros(N, T, 3 + len(model.skel_structure) * 4 + 1)  # initialize tensor of root + quaternions + counter
-        #     for n in range(N):
-        #         first_skel = x_pts[n, 0, :, :].cpu().numpy()
-        #         bones_lengths = [np.linalg.norm(first_skel[a] - first_skel[b]) for (a, b, _) in model.skel_structure]
-        #         for t in range(T):
-        #             root_pt = x_pts[n, t, 0, :]
-        #             sequence_t_pose = generate_t_pose(
-        #                 skel_name=model.skel_name,
-        #                 bones_lengths=bones_lengths,
-        #                 root_pt=root_pt.cpu().numpy()
-        #             )
-        #             skel_q = torch.from_numpy(cartesian_to_quaternion_pose(
-        #                 skel_pose=x_pts[n, t].cpu().numpy(),
-        #                 skel_resting_pose=sequence_t_pose,
-        #                 skel_structure=model.skel_structure
-        #             )[0].flatten()).to(device="cuda")
-        #             references_quaternions[n, t] = torch.cat((root_pt, skel_q, counter[n, t]))
-        #     references_quaternions = references_quaternions.to(device="cuda")
-        #
-        #     # === Transform back to cartesian representation
-        #     root_pts, quaternions, counter = references_quaternions[:, :, :3], references_quaternions[:, :, 3:-1], references_quaternions[:, :, -1:]
-        #     references_cartesian = torch.zeros(N, T, references.shape[-1])
-        #     for n in range(N):
-        #         first_skel = x_pts[n, 0, :, :].cpu().numpy()
-        #         bones_lengths = [np.linalg.norm(first_skel[a] - first_skel[b]) for (a, b, _) in model.skel_structure]
-        #         for t in range(T):
-        #             root_pt = root_pts[n, t].detach()
-        #             sequence_t_pose = generate_t_pose(
-        #                 skel_name=model.skel_name,
-        #                 bones_lengths=bones_lengths,
-        #                 root_pt=root_pt.cpu().numpy()
-        #             )
-        #             skel_cartesian = torch.from_numpy(quaternion_to_cartesian_pose(
-        #                 root_pt=root_pt.cpu().numpy(),
-        #                 skel_quaternions=quaternions[n, t].detach().cpu().numpy().reshape(-1, 4),
-        #                 skel_resting_pose=sequence_t_pose,
-        #                 bones_lengths=np.array(bones_lengths),
-        #                 skel_structure=model.skel_structure,
-        #             ).flatten()).to(device="cuda")
-        #             references_cartesian[n, t] = torch.cat((skel_cartesian, counter[n, t]))
-        #     references = references_cartesian.clone().to(device="cuda")
-        #
-        #     references = list(torch.unbind(references, dim=0))  # get back to list of tensors
-        #
-        #     print("Computed: `references = QuartToCart( CartToQuart( references ) )`")
-        # -------------------------------------------------------------------------------------
-
-        # ========== Code from the original repo ============
-        # # Set which sequences to produce video for
-        # display = list(range(len(hypotheses)))
-        #
-        # # Produce videos for the produced hypotheses
-        # trainer.produce_validation_video(
-        #     output_joints=hypotheses,
-        #     inputs=inputs,
-        #     references=references,
-        #     model_dir=model_dir,
-        #     display=display,
-        #     type="test",
-        #     file_paths=file_paths,
-        # )
-        # ===================================================
-
-        # Following code was added by me (GF)
         if save_skeletal_poses:
             skel_dir = f"{eval_folder}/{data_set_name}_gt_vs_pred"
             if not os.path.isdir(skel_dir):
@@ -873,9 +763,7 @@ def test(cfg_file, ckpt: str = None, save_skeletal_poses: bool = False, produce_
                         output_folder=videos_dir,
                         output_name=Path(gt_vid).stem,
                         structure=ORIGINAL_S2SL_SKEL,
-                        # structure=ORIGINAL_S2SL_SKEL_INVERTED_HANDS,
                         fps=25,
-                        # scale=1,
                         scale=1/4,
                         attach_text=text,
                     )
@@ -889,7 +777,6 @@ def test(cfg_file, ckpt: str = None, save_skeletal_poses: bool = False, produce_
                         structure=ORIGINAL_S2SL_SKEL,
                         # structure=ORIGINAL_S2SL_SKEL_INVERTED_HANDS,
                         fps=25,
-                        # scale=1,
                         scale=1/4,
                     )
 

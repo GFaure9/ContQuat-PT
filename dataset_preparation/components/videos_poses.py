@@ -1,7 +1,6 @@
 import subprocess
 import logging
 import json
-# import glob
 import numpy as np
 from typing import List, Tuple
 
@@ -113,24 +112,6 @@ def extract_skel_poses(
         logger.info(f"Processing (sequentially) the videos to extract poses...")
         write_poses(videos_filepaths, ext_dir, cfg)
         logger.info(f"Finished writing JSON poses files to: {ext_dir}")
-
-
-# def compute_max_shoulder_to_shoulder(poses_folders: List[str], shoulders_ids: Tuple[int, int]):
-#     i1, i2 = shoulders_ids
-#
-#     skel_files = []
-#     for folder in poses_folders:
-#         skel_files += glob.glob(f"{folder}/*.json")
-#
-#     shoulder_to_shoulder_distances = []
-#     for skel_file in skel_files:
-#         with open(skel_file, "r") as file:
-#             skel_seq = np.array(json.load(file))  # (T_{seq}, N_pts * 3) i.e. originally (T_{seq}, 150)
-#             skel3d_t0 = skel_seq[0, :].reshape(-1, 3)  # Skel(t=0) in [[x y z]_1, ..., [x y z]_Npts] format
-#
-#             shoulder_to_shoulder_distances.append(np.linalg.norm(skel3d_t0[i1, :] - skel3d_t0[i2, :]))
-#
-#     return np.max(shoulder_to_shoulder_distances)
 
 
 def normalize_sequence(
