@@ -35,7 +35,7 @@ pip install -r requirements.txt
 #### Dataset
 
 The model was originally trained and tested on the [RWTH-PHOENIX-Weather 2014 T dataset](https://www-i6.informatik.rwth-aachen.de/~koller/RWTH-PHOENIX-2014-T/)
-(*Phoenix14T*) prepared as parallel `txt` files where each line represents a new sequence.
+(*Phoenix14T*) prepared as parallel TXT files where each line represents a new sequence.
 Hence, if you wish to train on *Phoenix14T* or another dataset, please prepare it by first creating the following files:
 - `{SUBSET}.files`: i-th line contains the name of the i-th sample
 - `{SUBSET}.text`: i-th line contains the spoken language subtitle of the i-th sample
@@ -44,12 +44,12 @@ Hence, if you wish to train on *Phoenix14T* or another dataset, please prepare i
 - `{SUBSET}.skels`: i-th line contains the representation of the continuous sign gestures of the i-th sample, as
 a flattened sequence of $T$ vectors of $N$ skeletal joints 3D coordinates and a counter value $t/T$
 
-`x1[0] y1[0] z1[0] ... xN[0] yN[0] zN[0] counter[0] ... x1[t] y1[t] z1[t] ... xN[t] yN[t] zN[t] counter[t] ...`
+`... x1[t] y1[t] z1[t] ... xN[t] yN[t] zN[t] counter[t] ...`
 
 - `{SUBSET}.quat`: i-th line contains the representation of the continuous sign gestures of the i-th sample, as
 a flattened sequence of $T$ vectors of $M$ skeletal bones rotations as quaternions and a counter value $t/T$ 
 
-`a1[0] b1[0] c1[0] d1[0] ... aM[0] bM[0] cM[0] dM[0] counter[0] ... a1[t] b1[t] c1[t] d1[t] ... aM[t] bM[t] cM[t] dM[t] counter[t]`
+`... a1[t] b1[t] c1[t] d1[t] ... aM[t] bM[t] cM[t] dM[t] counter[t] ...`
 
 Each element in a line, whether text or a number, is separated by a space (` `).
 
@@ -63,7 +63,7 @@ when defining a YAML configuration file (see examples in `/configs`).
 
 ## 4. Demos
 
-TODO
+Coming soon.
 
 ## How to cite?
 
