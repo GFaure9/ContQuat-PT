@@ -321,3 +321,110 @@ def angle_error(
         return angles.mean()
     else:
         return angles
+
+
+def get_bounding_boxes_radii(seq: np.ndarray) -> np.ndarray:
+    """
+    With `seq` a sequence of skeletal poses of shape (T, N_pts, 3) or (T, N_pts, 2), computes the
+    largest radii of the (x, y) bounding boxes of all N_pts joints.
+    Thus, output will be of shape (T, N_pts).
+    """
+    min_xys, max_xys = np.min(seq[:, :, :2], axis=0), np.max(seq[:, :, :2], axis=0)
+    return np.linalg.norm(max_xys - min_xys, axis=1)
+
+
+def pck(seq1: np.ndarray, seq2: np.ndarray, alpha: float = 0.2) -> float:
+    """
+    Computes Probability of Correct Key-point (PCK) between ref and hypothesis sequences
+    of skeletal poses of same shape (T, nPoints, k) where
+    k is generally 2 or 3 (for joints 2D or 3D Euclidean coordinates).
+
+    Parameters
+    ----------
+    seq1: np.ndarray
+        The ref (ground truth) sequence of skeletal T skeletal poses of the form:
+            np.array([ [ [x0, y0, z0], ..., [x_nPoints, y_nPoints, z_nPoints] ]_{t=0},
+                            ...
+                         [x0, y0, z0], ..., [x_nPoints, y_nPoints, z_nPoints] ]_{t=T} ] ])
+
+    seq2: np.ndarray
+        The hypothesis (predicted) sequence of T skeletal poses of the same form as `seq1`.
+
+    alpha: float, optional
+        The ratio of the largest dimension of a seq1 joint J_seq1 bounding box to consider as the radius
+        of the sphere within which a joint J_seq2 has two fall to be considered correct.
+        I.e. {J_seq2 is correct} <=> |J_seq2 - J_seq1| < alpha * d_largest
+        `alpha` takes values between 0 and 1.
+
+    Returns
+    -------
+    float
+        The PCK - mean score - between `seq1` (ref) and `seq2` (hypothesis).
+    """
+    assert len(seq1) == len(seq2), "Sequences of skeletal poses `seq1` and `seq2` must be of same length"
+
+    distances: np.ndarray = np.linalg.norm(seq1 - seq2, axis=2)  # shape: (T, nPoints)
+    keypoint_overlap = (distances <= get_bounding_boxes_radii(seq1) * alpha)
+
+    return np.mean(keypoint_overlap)
+
+
+# Apply DTW to the produced sequence, so it can be visually compared to the reference sequence
+def alter_DTW_timing(pred_seq,ref_seq):
+
+    # Define a cost function
+    euclidean_norm = lambda x, y: np.sum(np.abs(x - y))
+
+    # Cut the reference down to the max count value
+    _ , ref_max_idx = torch.max(ref_seq[:, -1], 0)
+    if ref_max_idx == 0: ref_max_idx += 1
+    # Cut down frames by counter
+    ref_seq = ref_seq[:ref_max_idx,:].cpu().numpy()
+
+    # Cut the hypothesis down to the max count value
+    _, hyp_max_idx = torch.max(pred_seq[:, -1], 0)
+    if hyp_max_idx == 0: hyp_max_idx += 1
+    # Cut down frames by counter
+    pred_seq = pred_seq[:hyp_max_idx,:].cpu().numpy()
+
+    # Run DTW on the reference and predicted sequence
+    d, cost_matrix, acc_cost_matrix, path = dtw(ref_seq[:,:-1], pred_seq[:,:-1], dist=euclidean_norm)
+
+    # Normalise the dtw cost by sequence length
+    d = d / acc_cost_matrix.shape[0]
+
+    # Initialise new sequence
+    new_pred_seq = np.zeros_like(ref_seq)
+    # j tracks the position in the reference sequence
+    j = 0
+    skips = 0
+    squeeze_frames = []
+    for (i, pred_num) in enumerate(path[0]):
+
+        if i == len(path[0]) - 1:
+            break
+
+        if path[1][i] == path[1][i + 1]:
+            skips += 1
+
+        # If a double coming up
+        if path[0][i] == path[0][i + 1]:
+            squeeze_frames.append(pred_seq[i - skips])
+            j += 1
+        # Just finished a double
+        elif path[0][i] == path[0][i - 1]:
+            new_pred_seq[pred_num] = avg_frames(squeeze_frames)
+            squeeze_frames = []
+        else:
+            new_pred_seq[pred_num] = pred_seq[i - skips]
+
+    return new_pred_seq, ref_seq, d
+
+# Find the average of the given frames
+def avg_frames(frames):
+    frames_sum = np.zeros_like(frames[0])
+    for frame in frames:
+        frames_sum += frame
+
+    avg_frame = frames_sum / len(frames)
+    return avg_frame

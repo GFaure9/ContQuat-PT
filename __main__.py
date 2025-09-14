@@ -1,4 +1,13 @@
-# todo: clean / comment / adapt imports
+"""
+Main function to run either training or evaluation of the SLP model.
+Ex:
+    python __main__.py --mode=train --config_path=path/to/your/cfg.yaml
+
+    OR
+
+    python __main__.py --mode=test --config_path=path/to/your/cfg.yaml --ckpt=path/to/your/best.ckpt
+"""
+
 import argparse
 
 from .training import train, test

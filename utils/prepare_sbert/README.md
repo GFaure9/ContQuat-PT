@@ -1,0 +1,1 @@
+# Preparing Sentence-BERT embeddings from original text data
