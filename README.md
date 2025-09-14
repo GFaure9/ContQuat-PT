@@ -7,17 +7,6 @@ Source code for the paper ["Towards Skeletal and Signer Noise Reduction in Sign 
 Quaternion-Based Pose Encoding and Contrastive Learning"](https://doi.org/10.48550/arXiv.2508.14574)
 (Guilhem Fauré, Mostafa Sadeghi, Sam Bigeard, Slim Ouni - IVA 2025 SLTAT Workshop).
 
-## Table of Contents
-[1. Description](#1-description)
-
-[2. Installation](#2-installation)
-
-[3. Usage](#3-usage)
-
-[4. Demos](#4-demos)
-
----
-
 ## 1. Description
 
 *ContQuat-PT* uses the [Progressive Transformers](https://doi.org/10.48550/arXiv.2004.14874)
@@ -53,11 +42,14 @@ Hence, if you wish to train on *Phoenix14T* or another dataset, please prepare i
 - `{SUBSET}.gloss`: i-th line contains the gloss sequence corresponding to the continuous sign gestures of the i-th sample (if available)
 - `{SUBSET}.sbert`: i-th line contains the SBERT embedding of the i-th line of the .text file
 - `{SUBSET}.skels`: i-th line contains the representation of the continuous sign gestures of the i-th sample, as
-a flattened sequence of $T$ vectors of $N$ skeletal joints 3D coordinates and a counter value $t/T$ 
-(`x1[0] y1[0] z1[0] ... xN[0] yN[0] zN[0] counter[0] ... x1[t] y1[t] z1[t] ... xN[t] yN[t] zN[t] counter[t] ...`)
+a flattened sequence of $T$ vectors of $N$ skeletal joints 3D coordinates and a counter value $t/T$
+
+`x1[0] y1[0] z1[0] ... xN[0] yN[0] zN[0] counter[0] ... x1[t] y1[t] z1[t] ... xN[t] yN[t] zN[t] counter[t] ...`
+
 - `{SUBSET}.quat`: i-th line contains the representation of the continuous sign gestures of the i-th sample, as
 a flattened sequence of $T$ vectors of $M$ skeletal bones rotations as quaternions and a counter value $t/T$ 
-(`a1[0] b1[0] c1[0] d1[0] ... aM[0] bM[0] cM[0] dM[0] counter[0] ... a1[t] b1[t] c1[t] d1[t] ... aM[t] bM[t] cM[t] dM[t] counter[t]`)
+
+`a1[0] b1[0] c1[0] d1[0] ... aM[0] bM[0] cM[0] dM[0] counter[0] ... a1[t] b1[t] c1[t] d1[t] ... aM[t] bM[t] cM[t] dM[t] counter[t]`
 
 Each element in a line, whether text or a number, is separated by a space (` `).
 
@@ -84,6 +76,8 @@ If you use this code in your research, please cite the following paper:
 	booktitle   =   {ACM International Conference on Intelligent Virtual Agents (IVA Adjunct ’25)},
 	year		=	{2025}}
 ```
+
+---
 
 ### Acknowledgments
 
