@@ -1,15 +1,11 @@
 # ContQuat-PT
 
-Incorporation of **Cont**rastive learning and **Quat**ernion-based pose encoding 
-in a **P**rogressive **T**ransformers-like model for *sign language production*.
+_Incorporation of **Cont**rastive learning and **Quat**ernion-based pose encoding 
+in a **P**rogressive **T**ransformers-like model for sign language production._
 
----
-
-*Source code for the paper ["Towards Skeletal and Signer Noise Reduction in Sign Language Production via 
+Source code for the paper ["Towards Skeletal and Signer Noise Reduction in Sign Language Production via 
 Quaternion-Based Pose Encoding and Contrastive Learning"](https://doi.org/10.48550/arXiv.2508.14574)
-(Guilhem Fauré, Mostafa Sadeghi, Sam Bigeard, Slim Ouni - IVA 2025 SLTAT Workshop).*
-
----
+(Guilhem Fauré, Mostafa Sadeghi, Sam Bigeard, Slim Ouni - IVA 2025 SLTAT Workshop).
 
 ## Table of Contents
 [1. Description](#1-description)
