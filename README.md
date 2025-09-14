@@ -16,6 +16,8 @@ Quaternion-Based Pose Encoding and Contrastive Learning"](https://doi.org/10.485
 
 [4. Demos](#4-demos)
 
+---
+
 ## 1. Description
 
 *ContQuat-PT* uses the [Progressive Transformers](https://doi.org/10.48550/arXiv.2004.14874)
@@ -23,7 +25,7 @@ backbone architecture while allowing the following modifications and/or extensio
 - possibility to encode en predict skeletal poses via bone rotations using quaternion-based parametrization, and
 replacing the MSE loss by a geodesic loss
 - possibility to add a supervised contrastive loss (either based on gloss or SBERT similarity between sentences)
-on the decoder's self-attention outputs, as a regularization term in the definition of the global loss.
+on the decoder's self-attention outputs, as a regularization term in the definition of the global loss
 
 The following diagram provides an overview of the architecture and shows how our contributions integrate into it:
 
@@ -41,7 +43,31 @@ pip install -r requirements.txt
 
 ## 3. Usage
 
-TODO
+#### Dataset
+
+The model was originally trained and tested on the [RWTH-PHOENIX-Weather 2014 T dataset](https://www-i6.informatik.rwth-aachen.de/~koller/RWTH-PHOENIX-2014-T/)
+(*Phoenix14T*) prepared as parallel `txt` files where each line represents a new sequence.
+Hence, if you wish to train on *Phoenix14T* or another dataset, please prepare it by first creating the following files:
+- `{SUBSET}.files`: i-th line contains the name of the i-th sample
+- `{SUBSET}.text`: i-th line contains the spoken language subtitle of the i-th sample
+- `{SUBSET}.gloss`: i-th line contains the gloss sequence corresponding to the continuous sign gestures of the i-th sample (if available)
+- `{SUBSET}.sbert`: i-th line contains the SBERT embedding of the i-th line of the .text file
+- `{SUBSET}.skels`: i-th line contains the representation of the continuous sign gestures of the i-th sample, as
+a flattened sequence of $T$ vectors of $N$ skeletal joints 3D coordinates and a counter value $t/T$ 
+(`x1[0] y1[0] z1[0] ... xN[0] yN[0] zN[0] counter[0] ... x1[t] y1[t] z1[t] ... xN[t] yN[t] zN[t] counter[t] ...`)
+- `{SUBSET}.quat`: i-th line contains the representation of the continuous sign gestures of the i-th sample, as
+a flattened sequence of $T$ vectors of $M$ skeletal bones rotations as quaternions and a counter value $t/T$ 
+(`a1[0] b1[0] c1[0] d1[0] ... aM[0] bM[0] cM[0] dM[0] counter[0] ... a1[t] b1[t] c1[t] d1[t] ... aM[t] bM[t] cM[t] dM[t] counter[t]`)
+
+Each element in a line, whether text or a number, is separated by a space (` `).
+
+Extensions to use for source -input-, target -predicted output- and samples' names
+must be specified respectively in `src`, `trg` and `files` fields
+when defining a YAML configuration file (see examples in `/configs`).
+
+#### Training
+
+#### Testing
 
 ## 4. Demos
 
