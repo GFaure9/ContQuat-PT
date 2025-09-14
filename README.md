@@ -22,13 +22,12 @@ Quaternion-Based Pose Encoding and Contrastive Learning"](https://doi.org/10.485
 backbone architecture while allowing the following modifications and/or extensions:
 - possibility to encode en predict skeletal poses via bone rotations using quaternion-based parametrization, and
 replacing the MSE loss by a geodesic loss
-- possibility to add a supervised contrastive learning loss (either based on gloss or SBERT similarity between sentences)
-on the decoder's self-attention outputs in the definition of the global loss, as a regularization term controlled
-by a parameter $\lambda$
+- possibility to add a supervised contrastive loss (either based on gloss or SBERT similarity between sentences)
+on the decoder's self-attention outputs, as a regularization term in the definition of the global loss.
 
 The following diagram provides an overview of the architecture and shows how our contributions integrate into it:
 
-![Architecture](./images/architecture.png)
+<img src="./architecture.png" alt="Architecture" width="400">
 
 ## 2. Installation
 
