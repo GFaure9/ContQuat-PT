@@ -27,7 +27,7 @@ on the decoder's self-attention outputs, as a regularization term in the definit
 
 The following diagram provides an overview of the architecture and shows how our contributions integrate into it:
 
-<img src="./architecture.png" alt="Architecture" width="400">
+<img src="./architecture.png" alt="Architecture" width="250">
 
 ## 2. Installation
 
