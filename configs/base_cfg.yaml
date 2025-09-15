@@ -3,13 +3,13 @@ data:
     trg: "skels"    # Target - 3D body co-ordinates (skels)
     files: "files"    # Filenames for each sequence
 
-    train: "../datasets/phoenix14t/phoenix14t_prog_trans/data/dataset/train"
-    dev: "../datasets/phoenix14t/phoenix14t_prog_trans/data/dataset/dev"
-    test: "../datasets/phoenix14t/phoenix14t_prog_trans/data/dataset/test"
+    train: "path/to/your/train/dataset"
+    dev: "path/to/your/dev/dataset"
+    test: "path/to/your/test/dataset"
 
     max_sent_length: 300 # Max Sentence Length
-    skip_frames: 2   # Skip frames in the data, to reduce the data input size
-    src_vocab: "./t2sl_prog_trans/configs/src_vocab.txt"
+    skip_frames: 1   # Skip frames in the data, to reduce the data input size
+    src_vocab: "path/to/your/vocab/file.txt"  # e.g. here: "./configs/src_vocab.txt"
 
 training:
     random_seed: 27   # Random seed for initialisation
@@ -27,7 +27,7 @@ training:
     validation_freq: 10000  # After how many steps to run a validation on the model
     logging_freq: 250  # After how many steps to log training progress
     eval_metric: "dtw"  # Evaluation metric during training (dtw','bt')
-    model_dir: "./t2sl_prog_trans/results/base_model" # Where the model shall be stored
+    model_dir: "./results_model" # Where the model shall be stored
     overwrite: False # Flag to overwrite a previous saved model in the model_dir
     continue: True  # Flag to continue from a previous saved model in the model_dir
     shuffle: True  # Flag to shuffle the data during training
@@ -35,8 +35,8 @@ training:
     max_output_length: 300 # Max Output Length
     keep_last_ckpts: 1 # How many previous best/latest checkpoints to keep
     loss: "MSE"  # Loss function (MSE, L1)
-    supervised_contrastive_loss: no  # added by me (GF) - whether to incorporate L_supCont
-    sbert_contrastive_loss: no  # added by me (GF) - whether to incorporate L_sBERTCont
+    supervised_contrastive_loss: no  # whether to incorporate L_supCont
+    sbert_contrastive_loss: no  # whether to incorporate L_sBERTCont
 
 model:
     initializer: "xavier" # Model initialisation (Xavier, ...)

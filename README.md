@@ -40,7 +40,7 @@ Hence, if you wish to train on *Phoenix14T* or another dataset, please prepare i
 - `{SUBSET}.files`: i-th line contains the name of the i-th sample
 - `{SUBSET}.text`: i-th line contains the spoken language subtitle of the i-th sample
 - `{SUBSET}.gloss`: i-th line contains the gloss sequence corresponding to the continuous sign gestures of the i-th sample (if available)
-- `{SUBSET}.sbert`: i-th line contains the SBERT embedding of the i-th line of the .text file
+- `{SUBSET}.sbert`: i-th line contains the SBERT embedding of the i-th line of the `.text` file
 - `{SUBSET}.skels`: i-th line contains the representation of the continuous sign gestures of the i-th sample, as
 a flattened sequence of $T$ vectors of $N$ skeletal joints 3D coordinates and a counter value $t/T$
 
@@ -51,7 +51,7 @@ a flattened sequence of $T$ vectors of $M$ skeletal bones rotations as quaternio
 
 `... a1[t] b1[t] c1[t] d1[t] ... aM[t] bM[t] cM[t] dM[t] counter[t] ...`
 
-Each element in a line, whether text or a number, is separated by a space (` `).
+Each element in a line, whether text or a number, is separated by a space.
 
 Extensions to use for source -input-, target -predicted output- and samples' names
 must be specified respectively in `src`, `trg` and `files` fields

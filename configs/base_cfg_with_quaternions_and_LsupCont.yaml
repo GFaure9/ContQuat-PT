@@ -3,15 +3,15 @@ data:
     trg: "quat"    # Target - 3D Root coordinates and limbs rotations in Quaternions format (4D * N_bones)
     files: "files"    # Filenames for each sequence
 
-    train: "../datasets/phoenix14t/phoenix14t_prog_trans/data/dataset/train"
-    dev: "../datasets/phoenix14t/phoenix14t_prog_trans/data/dataset/dev"
-    test: "../datasets/phoenix14t/phoenix14t_prog_trans/data/dataset/test"
+    train: "path/to/your/train/dataset"
+    dev: "path/to/your/dev/dataset"
+    test: "path/to/your/test/dataset"
 
     max_sent_length: 300 # Max Sentence Length
     skip_frames: 1   # Skip frames in the data, to reduce the data input size
-    src_vocab: "./t2sl_prog_trans/configs/src_vocab.txt"
+    src_vocab: "path/to/your/vocab/file.txt"  # e.g. here: "./configs/src_vocab.txt"
 
-    mean_bones_lengths: "../datasets/phoenix14t/phoenix14t_prog_trans/data/dataset/mean_bones_lengths.txt"  # added by GF
+    mean_bones_lengths: "path/to/your/mean_bones_lengths.txt"  # e.g. here: "./configs/mean_bones_lengths.txt"
 
 training:
     random_seed: 27   # Random seed for initialisation
@@ -29,7 +29,7 @@ training:
     validation_freq: 10000  # After how many steps to run a validation on the model
     logging_freq: 250  # After how many steps to log training progress
     eval_metric: "dtw"  # Evaluation metric during training (dtw','bt')
-    model_dir: "./t2sl_prog_trans/results/model_with_quaternions_and_LsupCont" # Where the model shall be stored
+    model_dir: "./results_quat_glossCL" # Where the model shall be stored
     overwrite: False # Flag to overwrite a previous saved model in the model_dir
     continue: True  # Flag to continue from a previous saved model in the model_dir
     shuffle: True  # Flag to shuffle the data during training
@@ -37,8 +37,8 @@ training:
     max_output_length: 300 # Max Output Length
     keep_last_ckpts: 1 # How many previous best/latest checkpoints to keep
     loss: "MSE_MGD"  # Loss function MSE_MGD : MSE for root joints + Mean Geodesic Distance for quaternions (added by GF)
-    supervised_contrastive_loss: yes  # added by me (GF) - whether to incorporate L_supCont
-    sbert_contrastive_loss: no  # added by me (GF) - whether to incorporate L_sBERTCont
+    supervised_contrastive_loss: yes  # whether to incorporate L_supCont
+    sbert_contrastive_loss: no  # whether to incorporate L_sBERTCont
 
 model:
     initializer: "xavier" # Model initialisation (Xavier, ...)
@@ -70,10 +70,10 @@ model:
         ff_size: 2048 # Feed-forward dimension (4 x hidden_size)
         dropout: 0.0 # Decoder Dropout
 
-    root_loss_scale: 1.0  # added by me (GF)
-    quaternions_loss_scale: 1.0  # added by me (GF)
-    counter_loss_scale: 1.0  # added by me (GF)
+    root_loss_scale: 1.0
+    quaternions_loss_scale: 1.0
+    counter_loss_scale: 1.0
 
-    sup_cont_loss_scale: 1.0  # added by me (GF)
-    sup_cont_params:  # added by me (GF)
-        tau: 1.0
+    sup_cont_loss_scale: 1.0
+    sup_cont_params:
+        tau: 1.0  # temperature param
