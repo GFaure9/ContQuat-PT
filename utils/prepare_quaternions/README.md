@@ -33,8 +33,6 @@ write_quat_file(
 print(f"Finished writing quaternions to: {DATASET_FOLDER}/{SUBSET}.quat")
 ```
 
----
-
 ### Quaternions formalism and computation: some insights
 
 While the classical representation of a skeletal pose using 3D cartesian coordinates

@@ -94,7 +94,27 @@ to the best PCK and DTW scores. Default is `5`.
 
 ## 4. Demos
 
-Coming soon.
+*Baseline VS Quaternion-based variant*
+
+<p align="center">
+  <img src="images/base_1.gif" alt="base_1" width="300"/>
+  <img src="images/quat_1.gif" alt="quat_1" width="300"/>
+</p>
+
+<p align="center">
+  <img src="images/base_2.gif" alt="base_2" width="300"/>
+  <img src="images/quat_2.gif" alt="quat_2" width="300"/>
+</p>
+
+*Baseline VS w/ Gloss-based CL VS w/ SBERT-based CL
+
+<p align="center">
+  <img src="images/base_3.gif" alt="base_3" width="300"/>
+  <img src="images/gloss_con_3.gif" alt="gloss_con_3" width="300"/>
+  <img src="images/sbert_con_3.gif" alt="sbert_con_3" width="300"/>
+</p>
+
+More demos coming soon...
 
 ## How to cite?
 
