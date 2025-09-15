@@ -77,7 +77,6 @@ $$
                      |
      (3) ---{2}---- (2) ---{2}---- (4)
 ```
-> where `(j)` is the node ID and `{i}` is the bone level (depth).
 
 Inversely, to obtain cartesian $(x, y, z)$ coordinates from quaternions, we will compute, recursively from the root node:
 
