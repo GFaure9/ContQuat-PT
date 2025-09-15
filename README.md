@@ -109,7 +109,7 @@ to the best PCK and DTW scores. Default is `5`.
   <img src="images/quat_2.gif" alt="quat_2" width="300"/>
 </p>
 
-*Baseline VS w/ Gloss-based CL VS w/ SBERT-based CL
+*Baseline VS w/ Gloss-based CL VS w/ SBERT-based CL*
 
 <p align="center">
   <img src="images/base_3.gif" alt="base_3" width="300"/>
