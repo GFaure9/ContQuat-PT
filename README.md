@@ -94,6 +94,9 @@ to the best PCK and DTW scores. Default is `5`.
 
 ## 4. Demos
 
+(**Right**: ground-truth; **Left**: prediction)
+
+
 *Baseline VS Quaternion-based variant*
 
 <p align="center">
