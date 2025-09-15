@@ -1,158 +1,84 @@
 # Preparing quaternion-based pose data from 3D cartesian joints coordinates data
 
+Once the `.skels` files have been computed for a given dataset, `.quat` files can be computed following the
+steps of this Python code:
 
-[//]: # (## 🔃 Skeletal Representations)
+```python
+# -- Imports
+from . import load_skel_sequences, cart_to_quat, write_quat_file
 
-[//]: # ()
-[//]: # (Helper tools to **write skeletal poses with different formalisms** and **go from one to another** effortlessly.)
+# -- Global variable
+SUBSET="name_of_the_subset"  # 'train', 'test', 'dev', etc.
+DATASET_FOLDER="path/to/your/dataset/folder"  # folder containing 'train.skels', 'test.skels' and 'dev.skels' files
 
-[//]: # ()
-[//]: # (---)
+# -- 1) Loading cartesian coordinates of joints (skeletal pose sequences)
+print(f"Starting loading {SUBSET}.skels file...")
+skel_sequences = load_skel_sequences(DATASET_FOLDER, SUBSET)  # N.B: it removes the counter
+print(f"Loaded {SUBSET}.skels file!")
 
-[//]: # ()
-[//]: # (### Classical absolute cartesian representation)
+# -- 2) Computing quaternions sequences from joints coordinates
+print(f"Starting computing quaternions for each skeletal sequence...")
+root_pts_sequences, quat_sequences = cart_to_quat(skel_sequences)  # skel_structure is `ORIGINAL_S2SL_SKEL` by default
+print("Finished computing quaternions for all sequences!")
 
-[//]: # ()
-[//]: # ($$ \textbf{SkelPose}^{cart} := &#40;&#40;x_k, y_k, z_k&#41;&#41;_{1 \leq k \leq N} =: &#40;X_k&#41;_k \in \mathbb{R}^{N \times 3} $$)
+# -- 3) Writing computed quaternion-based encodings of skeletal pose sequences to DATASET_FOLDER/SUBSET.quat
+print(f"Starting writing quaternions to: {DATASET_FOLDER}/{SUBSET}.quat")
+write_quat_file(
+    quat_sequences,
+    DATASET_FOLDER,
+    SUBSET,
+    with_counter=True,  # last value of each skeleton quaternion-based pose is the corresponding counter value t/T
+    root_points_sequences=root_pts_sequences
+)
+print(f"Finished writing quaternions to: {DATASET_FOLDER}/{SUBSET}.quat")
+```
 
-[//]: # ()
-[//]: # (---)
+---
 
-[//]: # ()
-[//]: # (### Quaternion-based representation)
+### Quaternions formalism and computation: some insights
 
-[//]: # ()
-[//]: # ($$ \textbf{SkelPose}^{quart} := )
+While the classical representation of a skeletal pose using 3D cartesian coordinates
+of joints can be written as follows:
 
-[//]: # (&#40;&#40;\cos&#40;\frac{\theta}{2}&#41;, \sin&#40;\frac{\theta}{2}&#41; u_x^{&#40;i&#41;}, \sin&#40;\frac{\theta}{2}&#41; u_y^{&#40;i&#41;}, \sin&#40;\frac{\theta}{2}&#41; u_z^{&#40;i&#41;}, l_i&#41;&#41;_{1 \leq i \leq M} $$)
+$$ \textbf{SkelPose}^{cart} := ((x_k, y_k, z_k))_{1 \leq k \leq N} =: (X_k)_k \in \mathbb{R}^{N \times 3} $$
 
-[//]: # ($$ =: &#40;q^{&#40;i&#41;}_1, q^{&#40;i&#41;}_2, q^{&#40;i&#41;}_3, q^{&#40;i&#41;}_4, l_i&#41;_i )
+the quaternion-based representation is expressed as:
 
-[//]: # (\in \mathbb{R}^{M \times 5} $$)
+$$ \textbf{SkelPose}^{quart} := 
+((\cos(\frac{\theta}{2}), \sin(\frac{\theta}{2}) u_x^{(i)}, \sin(\frac{\theta}{2}) u_y^{(i)}, \sin(\frac{\theta}{2}) u_z^{(i)}, l_i))_{1 \leq i \leq M} $$
+$$ =: (q^{(i)}_1, q^{(i)}_2, q^{(i)}_3, q^{(i)}_4, l_i)_i 
+\in \mathbb{R}^{M \times 5} $$
+$$ \text{with } \| u^{(i)} \| = 1 $$
+$$ \text{and } X_{root} \in \mathbb{R}^3 $$
+$$ \text{and } G_{Skel} := (V, E) $$
+$$ \text{where } V := \{ 1, 2, ..., N \},~ E := \{ (V_{Parent_i}, V_{Child_i}), 1 \leq i \leq M \} $$
 
-[//]: # ($$ \text{with } \| u^{&#40;i&#41;} \| = 1 $$)
+Note that from the graph structure $G_{Skel}$ of the skeleton as a tree, 
+and a bind pose $(X_k^0)_k$ (e.g. T-pose), one can obtain the quaternions-based representation
+of the pose from the cartesian 3D coordinates by computing, recursively, starting from the root node:
 
-[//]: # ($$ \text{and } X_{root} \in \mathbb{R}^3 $$)
+$$
+q^{(i)} = (\cos(\frac{\theta^{(i)}}{2}), \sin(\frac{\theta^{(i)}}{2}) u^{(i)})~ \text{where}~\begin{cases}
+v^{(i)} = \frac{X_{Child_i} - X_{Parent_i}}{\| X_{Child_i} - X_{Parent_i} \|}, ~  v^{(i)}_0 
+= \frac{X_{Child_i}^0 - X_{Parent_i}^0}{\| X_{Child_i}^0 - X_{Parent_i}^0 \|} \\
+u^{(i)} = \frac{ v^{(i)} \wedge v^{(i)}_0 }{\| v^{(i)} \wedge v^{(i)}_0 \|} \\
+\theta^{(i)} = \arccos(v^{(i)} \cdot v^{(i)}_0)
+\end{cases}
+$$
 
-[//]: # ($$ \text{and } G_{Skel} := &#40;V, E&#41; $$)
+> [!NOTE]
+> In our code, the skeletal graph structure will typically be defined through a tuple of triplets 
+> `(Node ID Parent, Node ID Child, Node's Depth)`.
+> For example, `((1, 2, 1), (2, 3, 2), (2, 4, 2)` describes the following very simple skeletal graph structure:
+```
+                    (1)
+                     |
+                    {1}
+                     |
+     (3) ---{2}---- (2) ---{2}---- (4)
+```
+> where `(j)` is the node ID and `{i}` is the bone level (depth).
 
-[//]: # ($$ \text{where } V := \{ 1, 2, ..., N \},~ E := \{ &#40;V_{Parent_i}, V_{Child_i}&#41;, 1 \leq i \leq M \} $$)
+Inversely, to obtain cartesian $(x, y, z)$ coordinates from quaternions, we will compute, recursively from the root node:
 
-[//]: # ()
-[//]: # (Given the graph structure $G_{Skel}$ of the skeleton as a tree, )
-
-[//]: # (and a bind pose $&#40;X_k^0&#41;_k$ &#40;e.g. T-pose&#41;, one can obtain the quaternions-based representation)
-
-[//]: # (of the pose from the cartesian 3D coordinates by computing, recursively, starting from the root node:)
-
-[//]: # ()
-[//]: # ($$)
-
-[//]: # (q^{&#40;i&#41;} = &#40;\cos&#40;\frac{\theta^{&#40;i&#41;}}{2}&#41;, \sin&#40;\frac{\theta^{&#40;i&#41;}}{2}&#41; u^{&#40;i&#41;}&#41;~ \text{where}~\begin{cases})
-
-[//]: # (v^{&#40;i&#41;} = \frac{X_{Child_i} - X_{Parent_i}}{\| X_{Child_i} - X_{Parent_i} \|}, ~  v^{&#40;i&#41;}_0 )
-
-[//]: # (= \frac{X_{Child_i}^0 - X_{Parent_i}^0}{\| X_{Child_i}^0 - X_{Parent_i}^0 \|} \\)
-
-[//]: # (u^{&#40;i&#41;} = \frac{ v^{&#40;i&#41;} \wedge v^{&#40;i&#41;}_0 }{\| v^{&#40;i&#41;} \wedge v^{&#40;i&#41;}_0 \|} \\)
-
-[//]: # (\theta^{&#40;i&#41;} = \arccos&#40;v^{&#40;i&#41;} \cdot v^{&#40;i&#41;}_0&#41;)
-
-[//]: # (\end{cases})
-
-[//]: # ($$)
-
-[//]: # ()
-[//]: # (Inversely, to obtain cartesian $&#40;x, y, z&#41;$ coordinates from quaternions, we will compute, recursively from the root node:)
-
-[//]: # ()
-[//]: # ($$ &#40;0, X_k&#41; = &#40;0, X_{\text{Parent of }k}&#41; + l_{i_k} \left&#40; q^{&#40;i_k&#41;} &#40;0, v^{&#40;i_k&#41;}_0&#41; {q^{&#40;i_k&#41;}}^{-1} \right&#41;$$)
-
-[//]: # ()
-[//]: # (#### *Distance between quaternions &#40;the geodesic norm&#41;*)
-
-[//]: # ()
-[//]: # (The distance between two quaternions $q$ and $q'$ can be expressed through the geodesic distance as:)
-
-[//]: # ()
-[//]: # ($$ d_g&#40;q, q'&#41; := | ln&#40;q^{-1} q'&#41; | $$)
-
-[//]: # ()
-[//]: # (where $q^{-1} = \frac{\overline{q}}{\| q \| ^2}$ with $\overline{q} = &#40;\cos&#40;\frac{\theta}{2}&#41;, -\sin&#40;\frac{\theta}{2}&#41; u&#41;$)
-
-[//]: # (the conjugate of $q$.)
-
-[//]: # ()
-[//]: # (Or:)
-
-[//]: # ()
-[//]: # ($$ d_g&#40;q, q'&#41; := \arccos&#40; 2 &#40;q q'&#41;^2 - 1&#41; $$)
-
-[//]: # ()
-[//]: # (**Sources**: *geodesic norm* section in the [Quaternion Wiki page]&#40;https://en.wikipedia.org/wiki/Quaternion&#41;.)
-
-[//]: # ()
-[//]: # (## 🚹 Skeleton Structures)
-
-[//]: # ()
-[//]: # (*Helpers for common skeleton structures in SLP.*)
-
-[//]: # ()
-[//]: # (Typically, these structures will be **written in a graph-like structure** as follows.)
-
-[//]: # (If we want to represent the following structure:)
-
-[//]: # ()
-[//]: # (```)
-
-[//]: # (                    &#40;1&#41;)
-
-[//]: # (                     |)
-
-[//]: # (                    {1})
-
-[//]: # (                     |)
-
-[//]: # (     &#40;3&#41; ---{2}---- &#40;2&#41; ---{2}---- &#40;4&#41;)
-
-[//]: # (```)
-
-[//]: # ()
-[//]: # (where `{i}` is the bone level number and `&#40;j&#41;` is the node ID, we will write:)
-
-[//]: # ()
-[//]: # (```python)
-
-[//]: # (SKEL = &#40;)
-
-[//]: # (    &#40;1, 2, 1&#41;,  # &#40;ParentJointID, ChildJointID, BoneID&#41;)
-
-[//]: # (    &#40;2, 3, 2&#41;,)
-
-[//]: # (    &#40;2, 4, 2&#41;,)
-
-[//]: # (&#41;)
-
-[//]: # (```)
-
-[//]: # ()
-[//]: # (---)
-
-[//]: # ()
-[//]: # (### Usage)
-
-[//]: # ()
-[//]: # (Import a structure as follows:)
-
-[//]: # ()
-[//]: # (```python)
-
-[//]: # (from utils.skeleletal_structures_helper import YOUR_SKEL_STRUCTURE_NAME)
-
-[//]: # (```)
-
-[//]: # ()
-[//]: # (Possible values for `YOUR_SKEL_STRUCTURE_NAME` are listed below.)
-
-[//]: # ()
-[//]: # (---)
+$$ (0, X_k) = (0, X_{\text{Parent of }k}) + l_{i_k} \left( q^{(i_k)} (0, v^{(i_k)}_0) {q^{(i_k)}}^{-1} \right)$$

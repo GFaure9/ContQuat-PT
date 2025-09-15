@@ -55,11 +55,42 @@ Each element in a line, whether text or a number, is separated by a space (` `).
 
 Extensions to use for source -input-, target -predicted output- and samples' names
 must be specified respectively in `src`, `trg` and `files` fields
-when defining a YAML configuration file (see examples in `/configs`).
+when defining a YAML configuration file (see examples in [./configs](./configs) folder).
+
+Helper code and further instructions on how to easily prepare `.quat` and `.sbert` files are given at the following links:
+- [*Preparing quaternion-based pose data from 3D cartesian joints coordinates data*](./utils/prepare_quaternions/README.md)
+- [*Preparing Sentence-BERT embeddings from original text data*](./utils/prepare_sbert/README.md)
 
 #### Training
 
+To launch a training, first define a YAML configuration file following the format of the examples in the
+[./configs](./configs) folder. Then run the following command providing the path to your file:
+
+```commandline
+python __main__.py --mode=train --config_path=path/to/your/config.yaml
+```
+
+>[!NOTE]
+> To use quaternion-based pose encoding, remember to change `trg` field to `"quat"` and
+> to provide in the `mean_bones_lengths` field a path to a TXT file containing the skeleton's 
+> bones lengths to be used for joints positions derivation - notably for MJE and DTW computations (validation scores).
+
 #### Testing
+
+Once you have trained or retrieved a pre-trained *ContQuat-PT* model saved with `torch.save(...)` into a CKPT file,
+you can evaluate it on the `dev` and `test` sets by running the following command with the path to your training
+config file and to your model's state checkpoint:
+
+```commandline
+python __main__.py --mode=test --config_path=path/to/your/config.yaml --ckpt=path/to/your/model/checkpoint.ckpt
+```
+
+If wanted, the following keyword arguments can also be specified:
+- `--produce_videos`: whether to create validation videos showing ground truth versus predicted animated skeleton.
+Default is `True`.
+- `--n_videos`: number of predicted sequences to generate videos for, in addition to the ones corresponding 
+to the best PCK and DTW scores. Default is `5`.
+- `--save_skeletal_poses`: whether to save into JSON files the poses data of predicted sequences used for videos.
 
 ## 4. Demos
 

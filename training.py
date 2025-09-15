@@ -775,7 +775,6 @@ def test(
                         output_folder=videos_dir,
                         output_name=Path(pred_vid).stem,
                         structure=ORIGINAL_S2SL_SKEL,
-                        # structure=ORIGINAL_S2SL_SKEL_INVERTED_HANDS,
                         fps=25,
                         scale=1/4,
                     )

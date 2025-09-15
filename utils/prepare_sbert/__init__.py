@@ -1,1 +1,2 @@
-from .sentence_embedding import compute_sentences_embeddings
+from .sentence_embedding import load_pretrained_sentence_embeddings_model, compute_sentences_embeddings
+from .make_sbert import write_sbert_file, load_sentences
