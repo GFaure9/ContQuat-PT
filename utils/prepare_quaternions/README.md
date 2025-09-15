@@ -71,11 +71,11 @@ $$
 > `(Node ID Parent, Node ID Child, Node's Depth)`.
 > For example, `((1, 2, 1), (2, 3, 2), (2, 4, 2)` describes the following very simple skeletal graph structure:
 ```
-                    (1)
-                     |
-                    {1}
-                     |
-     (3) ---{2}---- (2) ---{2}---- (4)
+                                                        (1)
+                                                         |
+                                                        {1}
+                                                         |
+                                         (3) ---{2}---- (2) ---{2}---- (4)
 ```
 
 Inversely, to obtain cartesian $(x, y, z)$ coordinates from quaternions, we will compute, recursively from the root node:
