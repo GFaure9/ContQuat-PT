@@ -125,10 +125,12 @@ If you use this code in your research, please cite the following paper:
 
 ```
 @inproceedings{faure2025contquatpt,
-	title		=	{Towards Skeletal and Signer Noise Reduction in Sign Language Production via Quaternion-Based Pose Encoding and Contrastive Learning},
-	author		=	{Fauré, Guilhem and Sadeghi, Mostafa and Bigeard, Sam and Ouni, Slim},
-	booktitle   =   {ACM International Conference on Intelligent Virtual Agents (IVA Adjunct ’25)},
-	year		=	{2025}}
+  title     = {Towards Skeletal and Signer Noise Reduction in Sign Language Production via Quaternion-Based Pose Encoding and Contrastive Learning},
+  author    = {Fauré, Guilhem and Sadeghi, Mostafa and Bigeard, Sam and Ouni, Slim},
+  booktitle = {Proceedings of the 9th Workshop on Sign Language Translation and Avatar Technologies (SLTAT 2025), co-located with 25th ACM International Conference on Intelligent Virtual Agents (IVA 2025)},
+  year      = {2025}
+}
+
 ```
 
 ---
